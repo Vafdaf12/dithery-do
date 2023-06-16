@@ -1,0 +1,6 @@
+# clangd caches
+.cache/
+
+# Build files generate by CMake
+build/
+
