@@ -4,7 +4,7 @@ all:
 	make build
 
 build:
-	cmake -B build -S . 
+	cmake --build build/
 
 configure:
 	cmake -B build -S .

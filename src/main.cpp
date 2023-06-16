@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <string>
 
+#include "Image.h"
+
 int main(int argc, char** argv) {
     CLI::App app{"This is a CLI utility"};
 
@@ -26,7 +28,7 @@ int main(int argc, char** argv) {
         ->required(true)
         ->check(CLI::ExistingFile);
 
-    app.add_option("-o, --output", inFile, "The output image");
+    app.add_option("-o, --output", outFile, "The output image");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -37,8 +39,14 @@ int main(int argc, char** argv) {
     std::cout << "Write File: " << outFile << std::endl;
     std::cout << "Palette: " << paletteFile << std::endl;
 
-    uint8_t* data = stbi_load(inFile.c_str(), &w, &h, &n, 3);
-    stbi_write_jpg(outFile.c_str(), w, h, n, data, 100);
+    Image image;
+    if(!image.loadFromFile(inFile)) {
+        std::cout << "Could not load image" << std::endl;
+        return 1;
+    }
+
+    image.set(1, 0, {1, 0, 0});
+    image.writeToFile(outFile);
 
     glm::vec3 vec{1, 2, 3};
     std::cout << vec.x << " " << vec.y << " " << vec.z << std::endl;
