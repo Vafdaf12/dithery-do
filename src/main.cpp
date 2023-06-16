@@ -12,6 +12,7 @@
 #include <string>
 
 #include "Image.h"
+#include "Palette.h"
 
 int main(int argc, char** argv) {
     CLI::App app{"This is a CLI utility"};
@@ -40,10 +41,17 @@ int main(int argc, char** argv) {
     std::cout << "Palette: " << paletteFile << std::endl;
 
     Image image;
+    Palette palette;
+    if(!palette.loadFromFile(paletteFile)) {
+        std::cout << "Could not load palette" << std::endl;
+        return 1;
+    }
     if(!image.loadFromFile(inFile)) {
         std::cout << "Could not load image" << std::endl;
         return 1;
     }
+
+    std::cout << palette << std::endl;
 
     image.set(1, 0, {1, 0, 0});
     image.writeToFile(outFile);
