@@ -9,6 +9,12 @@ class Image {
 public:
     Image() = default;
 
+    Image(Image&& rhs);
+    Image(const Image& rhs);
+    Image& operator=(Image&& rhs);
+    Image& operator=(Image& rhs);
+    ~Image();
+
     // File-loading
     bool loadFromFile(const std::string& filename);
     bool writeToFile(const std::string& filename) const;

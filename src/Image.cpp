@@ -1,13 +1,61 @@
 #include "Image.h"
 
+#include "glm/common.hpp"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <unordered_map>
+
+Image::Image(Image&& rhs) {
+    m_pData = rhs.m_pData;
+    m_width = rhs.m_width;
+    m_height = rhs.m_height;
+    m_channels = rhs.m_channels;
+}
+Image::Image(const Image& rhs) {
+    m_width = rhs.m_width;
+    m_height = rhs.m_height;
+    m_channels = rhs.m_channels;
+
+    if(!rhs.m_pData) {
+        m_pData = nullptr;
+        return;
+    }
+
+    m_pData = new uint8_t[m_width * m_height * m_channels];
+    std::memcpy(m_pData, rhs.m_pData, m_width * m_height * m_channels);
+}
+Image& Image::operator=(Image&& rhs) {
+    std::swap(rhs.m_pData, m_pData);
+    std::swap(rhs.m_width, m_width);
+    std::swap(rhs.m_height, m_height);
+    std::swap(rhs.m_channels, m_channels);
+
+    return *this;
+}
+Image& Image::operator=(Image& rhs) {
+    m_width = rhs.m_width;
+    m_height = rhs.m_height;
+    m_channels = rhs.m_channels;
+
+    if(!rhs.m_pData) {
+        m_pData = nullptr;
+        return *this;
+    }
+
+    m_pData = new uint8_t[m_width * m_height * m_channels];
+    std::memcpy(m_pData, rhs.m_pData, m_width * m_height * m_channels);
+
+    return *this;
+}
+Image::~Image() {
+    if(m_pData) stbi_image_free(m_pData);
+}
 
 bool Image::loadFromFile(const std::string& filename) {
     m_pData = stbi_load(filename.c_str(), &m_width, &m_height, &m_channels, 3);
@@ -21,11 +69,7 @@ bool Image::writeToFile(const std::string& filename) const {
 
 glm::vec3 Image::get(int x, int y) const {
     uint8_t* pos = index(x, y);
-    return {
-        pos[0] / 255.0f,
-        pos[1] / 255.0f,
-        pos[2] / 255.0f
-    };
+    return glm::vec3(pos[0], pos[1], pos[2]) / 255.0f;
 }
 
 uint8_t* Image::index(int x, int y) const {
@@ -36,9 +80,18 @@ uint8_t* Image::index(int x, int y) const {
     return m_pData + (x + y * m_width) * m_channels;
 }
 
+int toRGB(float val) {
+    if(val <= 0) return 0;
+    if(val >= 1) return 255;
+    return std::round(val * 255);
+}
+
 void Image::set(int x, int y, const glm::vec3& col) {
     uint8_t* pos = index(x, y);
-    pos[0] = std::round(col.r * 255);
-    pos[1] = std::round(col.g * 255);
-    pos[2] = std::round(col.b * 255);
+    glm::vec3 c = glm::clamp(col, 0.0f, 1.0f) * 255.0f;
+    
+    pos[0] = c.r;
+    pos[1] = c.g;
+    pos[2] = c.b;
 }
+
