@@ -1,4 +1,6 @@
+#include "glm/common.hpp"
 #include "glm/ext/vector_float3.hpp"
+#include "glm/fwd.hpp"
 #include "glm/geometric.hpp"
 #include "glm/glm.hpp"
 
@@ -7,39 +9,70 @@
 #include "CLI/Config.hpp"
 #include "CLI/Validators.hpp"
 
+#include "select/IColorSelector.h"
+#include "select/SelectNearest.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <iterator>
+#include <memory>
 #include <string>
+#include <array>
 
 #include "Image.h"
 #include "Palette.h"
 
 using PaletteFunc = std::function<void(Image& img, const Palette& p, int x, int y)>;
+
+glm::vec3 convertToXYZ(glm::vec3 color) {
+    color.r = ((color.r > 0.04045) ? pow((color.r + 0.055) / 1.055, 2.4) : (color.r / 12.92)) * 100.0;
+    color.g = ((color.g > 0.04045) ? pow((color.g + 0.055) / 1.055, 2.4) : (color.g / 12.92)) * 100.0;
+    color.b = ((color.b > 0.04045) ? pow((color.b + 0.055) / 1.055, 2.4) : (color.b / 12.92)) * 100.0;
+
+    color.r = color.r*0.4124564 + color.g*0.3575761 + color.b*0.1804375;
+    color.g = color.r*0.2126729 + color.g*0.7151522 + color.b*0.0721750;
+    color.b = color.r*0.0193339 + color.g*0.1191920 + color.b*0.9503041;
+    return color;
+}
+
+
+glm::vec3 findClosest(const glm::vec3& target, const std::vector<glm::vec3>& colors) {
+    glm::vec3 xyz = convertToXYZ(target);
+    return *std::min_element(colors.begin(), colors.end(),
+        [&](const glm::vec3& v1, const glm::vec3& v2) {
+            return glm::distance(convertToXYZ(v1), xyz) < glm::distance(convertToXYZ(v2), xyz);
+        });
+}
+
 glm::vec3 snapColor(const glm::vec3& col, const Palette& p) {
     const std::vector<glm::vec3>& colors = p.colors();
 
-    const glm::vec3* col2 = nullptr;
-    const glm::vec3* col1 = &colors[0];
+    glm::vec3 col1 = findClosest(col, colors);
 
-    float diff = glm::length(*col1 - col);
-    for(int i = 1; i < colors.size(); i++) {
-        float dist = glm::length(colors[i] - col);
-        if(dist >= diff) continue;
-        diff = dist;
-        col2 = col1;
-        col1 = &colors[i];
-    }
-    if(!col2) return *col1;
+    glm::vec3 delta = convertToXYZ(col1) - convertToXYZ(col);
 
-    glm::vec3 dirRoot = glm::normalize(*col2 - *col1);
-    glm::vec3 dirCol = glm::normalize(col - *col1);
+    std::vector<glm::vec3> closest;
+    std::copy_if(
+        colors.begin(),
+        colors.end(),
+        std::back_inserter(closest),
+        [&](const glm::vec3& v) {
+            glm::vec3 d = convertToXYZ(v) - convertToXYZ(col1);
+            return glm::dot(d, delta) < 0;
+        }
+    );
+
+    if(closest.empty()) return col1;
+    glm::vec3 col2 = findClosest(col, closest);
+
+
+    glm::vec3 dirRoot = glm::normalize(col2 - col1);
+    glm::vec3 dirCol = glm::normalize(col - col1);
     float t = glm::clamp(glm::dot(dirRoot, dirCol), 0.f, 1.f);
-
-    return *col1 + (*col2 - *col1) * t;
+    return glm::mix(col1, col2, t);
 }
 
 void diffuse_steinberg(Image& img, const glm::vec3& err, int x, int y) {
@@ -69,6 +102,7 @@ int main(int argc, char** argv) {
     std::string inFile = "";
     std::string outFile = "output.jpg";
     std::string paletteFile = "palette.txt";
+    bool useXYZ = false;
 
     app.add_option("-f, --file", inFile, "The input image")
         ->required(true)
@@ -79,6 +113,8 @@ int main(int argc, char** argv) {
         ->check(CLI::ExistingFile);
 
     app.add_option("-o, --output", outFile, "The output image");
+
+    app.add_flag("--xyz", useXYZ);
 
     CLI11_PARSE(app, argc, argv);
 
@@ -95,13 +131,12 @@ int main(int argc, char** argv) {
     image.loadFromFile(inFile);
     palette.loadFromFile(paletteFile);
 
-
-    for(int y = 0; y < image.height()-1; y++) {
-        for(int x = 1; x < image.width()-1; x++) {
+    IColorSelector* selector = new SelectNearest(palette, useXYZ);
+    for(int y = 0; y < image.height(); y++) {
+        for(int x = 1; x < image.width(); x++) {
             glm::vec3 src = image.get(x, y);
-            glm::vec3 dest = snapColor(src, palette);
+            glm::vec3 dest = selector->select(src);
             image.set(x, y, dest);
-            diffuse_steinberg(image, src - dest, x, y);
         }
     }
 

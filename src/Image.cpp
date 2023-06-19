@@ -80,11 +80,6 @@ uint8_t* Image::index(int x, int y) const {
     return m_pData + (x + y * m_width) * m_channels;
 }
 
-int toRGB(float val) {
-    if(val <= 0) return 0;
-    if(val >= 1) return 255;
-    return std::round(val * 255);
-}
 
 void Image::set(int x, int y, const glm::vec3& col) {
     uint8_t* pos = index(x, y);

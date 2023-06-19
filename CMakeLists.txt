@@ -32,6 +32,7 @@ FetchContent_MakeAvailable(CLI11)
 file(GLOB SRCFILES
     src/*.cpp
     src/stb/*.cpp
+    src/select/*.cpp
 )
 
 add_executable(${NAME_EXE} ${SRCFILES})
