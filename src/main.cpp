@@ -8,7 +8,7 @@
 #include "glm/geometric.hpp"
 
 #include "select/IColorSelector.h"
-#include "select/SelectNearest.h"
+#include "select/ClosestEuclidian.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
@@ -129,8 +129,8 @@ int main(int argc, char** argv) {
     image.loadFromFile(inFile);
     palette.loadFromFile(paletteFile);
 
-    IColorSelector* selector = new SelectNearest(palette, space);
     IColorSpace* space = useXYZ ? new XyzColorSpace : nullptr;
+    IColorSelector* selector = new ClosestEuclidian(palette, space);
     for(int y = 0; y < image.height(); y++) {
         for(int x = 1; x < image.width(); x++) {
             glm::vec3 src = image.get(x, y);

@@ -1,9 +1,9 @@
-#include "SelectNearest.h"
+#include "ClosestEuclidian.h"
 #include "glm/geometric.hpp"
 #include <algorithm>
 #include <math.h>
 
-SelectNearest::SelectNearest(const Palette& palette, IColorSpace* colorSpace)
+ClosestEuclidian::ClosestEuclidian(const Palette& palette, IColorSpace* colorSpace)
     : m_palette(palette)
     , m_mappedColours(palette.colors())
     , m_pColorSpace(colorSpace)
@@ -20,7 +20,7 @@ SelectNearest::SelectNearest(const Palette& palette, IColorSpace* colorSpace)
     }
 }
 
-glm::vec3 SelectNearest::select(glm::vec3& target) {
+glm::vec3 ClosestEuclidian::select(glm::vec3& target) {
     glm::vec3 dest = target;
     if(m_pColorSpace) dest = m_pColorSpace->fromRGB(dest);
 

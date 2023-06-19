@@ -5,9 +5,9 @@
 
 #include "../color/IColorSpace.h"
 
-class SelectNearest : public IColorSelector {
+class ClosestEuclidian : public IColorSelector {
 public:
-    SelectNearest(const Palette& palette, IColorSpace* colorSpace = nullptr);
+    ClosestEuclidian(const Palette& palette, IColorSpace* colorSpace = nullptr);
     glm::vec3 select(glm::vec3& target) override;
 
 private:
