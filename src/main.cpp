@@ -1,13 +1,11 @@
-#include "glm/common.hpp"
-#include "glm/ext/vector_float3.hpp"
-#include "glm/fwd.hpp"
-#include "glm/geometric.hpp"
-#include "glm/glm.hpp"
+#include "color/XyzColorSpace.h"
 
 #include "CLI/App.hpp"
 #include "CLI/Formatter.hpp"
 #include "CLI/Config.hpp"
 #include "CLI/Validators.hpp"
+
+#include "glm/geometric.hpp"
 
 #include "select/IColorSelector.h"
 #include "select/SelectNearest.h"
@@ -131,7 +129,8 @@ int main(int argc, char** argv) {
     image.loadFromFile(inFile);
     palette.loadFromFile(paletteFile);
 
-    IColorSelector* selector = new SelectNearest(palette, useXYZ);
+    IColorSelector* selector = new SelectNearest(palette, space);
+    IColorSpace* space = useXYZ ? new XyzColorSpace : nullptr;
     for(int y = 0; y < image.height(); y++) {
         for(int x = 1; x < image.width(); x++) {
             glm::vec3 src = image.get(x, y);

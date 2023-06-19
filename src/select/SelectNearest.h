@@ -3,14 +3,16 @@
 #include "IColorSelector.h"
 #include "../Palette.h"
 
+#include "../color/IColorSpace.h"
+
 class SelectNearest : public IColorSelector {
 public:
-    SelectNearest(const Palette& palette, bool xyz = false);
+    SelectNearest(const Palette& palette, IColorSpace* colorSpace = nullptr);
     glm::vec3 select(glm::vec3& target) override;
 
 private:
-    static glm::vec3 toXYZ(glm::vec3 rgb);
-
     const Palette& m_palette;
-    bool m_xyz;
+    IColorSpace* m_pColorSpace;
+
+    std::vector<glm::vec3> m_mappedColours;
 };

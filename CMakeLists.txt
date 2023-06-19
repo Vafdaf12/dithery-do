@@ -33,6 +33,7 @@ file(GLOB SRCFILES
     src/*.cpp
     src/stb/*.cpp
     src/select/*.cpp
+    src/color/*.cpp
 )
 
 add_executable(${NAME_EXE} ${SRCFILES})
