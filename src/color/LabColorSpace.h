@@ -5,11 +5,12 @@
 
 class LabColorSpace : public IColorSpace {
 public:
+    DEF_COLORSPACE
+
     static const glm::vec3 D65;
     static const glm::vec3 D50;
 
     LabColorSpace(const glm::vec3& illuminant) : m_illuminant(illuminant) {}
-    glm::vec3 fromRGB(glm::vec3 color) const override;
 
 private:
     static float func(float t);
