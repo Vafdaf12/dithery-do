@@ -18,6 +18,11 @@ The colour space used can be configured using
 Similarly, the selection algorithm can be chosen with
 - `--select 0` Euclidian Distance (default)
 - `--select 1` Euclidian Distance + 2-color mix
+- `--select 2` 2-color mix using LAB Brightness partitioning
+
+The Brightness Partition method attempts to overcome LAB's issue in selecting colors with
+appropriate brightness. It does so by selecting a color brighter and darker than the target
+and blending between the two.
 
 # Building
 Building this project requires CMake, which can be installed on Debian-based OSs with
