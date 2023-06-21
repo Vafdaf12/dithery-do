@@ -10,11 +10,14 @@ The general CLI syntax for Dithery-Do is the following
 ```
 *Note: the necessary parameters can also be found by running `./DitherDo --help`*
 
-Currently the only supported algorithm selects the color with the shortest Euclidian distance from the target.
-However, specifying the colour space used *is* supported with the `--color-space` option:
-- `--color-space 0` RGB
+The colour space used can be configured using
+- `--color-space 0` RGB (default)
 - `--color-space 1` XYZ 
 - `--color-space 2` L*A*B (using D50 as illuminant)
+
+Similarly, the selection algorithm can be chosen with
+- `--select 0` Euclidian Distance (default)
+- `--select 1` Euclidian Distance + 2-color mix
 
 # Building
 Building this project requires CMake, which can be installed on Debian-based OSs with
