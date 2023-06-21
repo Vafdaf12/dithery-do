@@ -1,3 +1,6 @@
+TEST_FILE=examples/rainbow_cloud.jpg
+OUT_FILE=examples/output.jpg
+PALETTE=palette.txt
 
 all:
 	make configure
@@ -9,5 +12,8 @@ build:
 configure:
 	cmake -B build -S .
 
-.PHONY: build run all
+run:
+	./build/DitheryDo -f ${TEST_FILE} -o ${OUT_FILE} -p ${PALETTE} --color-space ${space} --select ${select}
+
+.PHONY: build run all configure
 
