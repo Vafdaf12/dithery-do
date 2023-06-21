@@ -1,9 +1,9 @@
-#include "ClosestMix.h"
+#include "ClosestLine.h"
 #include "glm/geometric.hpp"
 #include <algorithm>
 #include <math.h>
 
-ClosestMix::ClosestMix(const Palette& palette, IColorSpace* colorSpace)
+ClosestLine::ClosestLine(const Palette& palette, IColorSpace* colorSpace)
     : m_palette(palette)
     , m_mappedColours(palette.colors())
     , m_pColorSpace(colorSpace)
@@ -20,13 +20,13 @@ ClosestMix::ClosestMix(const Palette& palette, IColorSpace* colorSpace)
     }
 }
 
-glm::vec3 ClosestMix::mapRGB(glm::vec3 col) const {
+glm::vec3 ClosestLine::mapRGB(glm::vec3 col) const {
     if(!m_pColorSpace) return col;
     return m_pColorSpace->fromRGB(col);
 }
 
 
-glm::vec3 ClosestMix::select(glm::vec3& target) {
+glm::vec3 ClosestLine::select(glm::vec3& target) {
     glm::vec3 dest = mapRGB(target);
 
     int i = std::max_element(

@@ -8,7 +8,7 @@
 
 #include "glm/geometric.hpp"
 
-#include "select/ClosestMix.h"
+#include "select/ClosestLine.h"
 #include "select/IColorSelector.h"
 #include "select/ClosestEuclidian.h"
 #include "stb/stb_image.h"
@@ -48,7 +48,7 @@ enum ColorSpace {
 
 enum SelectionAlgo {
     SA_CLOSEST_EUCLID = 0,
-    SA_CLOSEST_MIX,
+    SA_CLOSEST_LINE,
 };
 
 
@@ -103,13 +103,13 @@ int main(int argc, char** argv) {
             break;
     }
 
-    IColorSelector* selector = new ClosestMix(palette, space);
+    IColorSelector* selector = new ClosestLine(palette, space);
     switch(selectionAlgorithm) {
         case SA_CLOSEST_EUCLID:
             selector = new ClosestEuclidian(palette, space);
             break;
-        case SA_CLOSEST_MIX:
-            selector = new ClosestMix(palette, space);
+        case SA_CLOSEST_LINE:
+            selector = new ClosestLine(palette, space);
             break;
     }
 

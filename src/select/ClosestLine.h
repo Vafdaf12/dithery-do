@@ -4,9 +4,9 @@
 #include "../Palette.h"
 #include "../color/IColorSpace.h"
 
-class ClosestMix : public IColorSelector {
+class ClosestLine : public IColorSelector {
 public:
-    ClosestMix(const Palette& palette, IColorSpace* colorSpace = nullptr);
+    ClosestLine(const Palette& palette, IColorSpace* colorSpace = nullptr);
     glm::vec3 select(glm::vec3& target) override;
 
 private:
