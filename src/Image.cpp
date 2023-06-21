@@ -59,6 +59,7 @@ Image::~Image() {
 
 bool Image::loadFromFile(const std::string& filename) {
     m_pData = stbi_load(filename.c_str(), &m_width, &m_height, &m_channels, 3);
+    m_channels = 3;
     std::cout << "Error: " << stbi_failure_reason() << std::endl;
     return m_pData != nullptr;
 }
