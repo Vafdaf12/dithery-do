@@ -8,6 +8,7 @@
 
 #include "glm/geometric.hpp"
 
+#include "select/ClosestPartition.h"
 #include "select/ClosestLine.h"
 #include "select/BrightnessPartition.h"
 #include "select/IColorSelector.h"
@@ -50,6 +51,7 @@ enum ColorSpace {
 enum SelectionAlgo {
     SA_CLOSEST_EUCLID = 0,
     SA_CLOSEST_LINE,
+    SA_CLOSEST_PARTITION,
     SA_CLOSEST_TRI,
 };
 
@@ -105,13 +107,16 @@ int main(int argc, char** argv) {
             break;
     }
 
-    IColorSelector* selector = new ClosestLine(palette, space);
+    IColorSelector* selector = new ClosestEuclidian(palette, space);
     switch(selectionAlgorithm) {
         case SA_CLOSEST_EUCLID:
             selector = new ClosestEuclidian(palette, space);
             break;
         case SA_CLOSEST_LINE:
             selector = new ClosestLine(palette, space);
+            break;
+        case SA_CLOSEST_PARTITION:
+            selector = new ClosestPartition(palette, space);
             break;
         case SA_CLOSEST_TRI:
             selector = new BrightnessPartition(palette);
