@@ -84,9 +84,7 @@ int main(int argc, char** argv) {
     int w, h, n;
 
 
-    std::cout << "Read File: " << inFile << std::endl;
-    std::cout << "Write File: " << outFile << std::endl;
-    std::cout << "Palette: " << paletteFile << std::endl;
+    std::cout << inFile << " -> " << outFile << std::endl;
 
     Image image;
     Palette palette;
@@ -94,42 +92,62 @@ int main(int argc, char** argv) {
     image.loadFromFile(inFile);
     palette.loadFromFile(paletteFile);
 
+    std::cout << palette << std::endl;
+
     IColorSpace* space;
+    std::cout << "Colour Space: ";
     switch(colorSpace) {
         case CS_RGB:
+            std::cout << "RGB";
             space = nullptr;
             break;
         case CS_XYZ:
+            std::cout << "XYZ";
             space = new XyzColorSpace;
             break;
         case CS_LAB:
+            std::cout << "L*a*b (D50)";
             space = new LabColorSpace(LabColorSpace::D50);
             break;
     }
+    std::cout << std::endl;
 
-    IColorSelector* selector = new ClosestEuclidian(palette, space);
+    std::cout << "Algorithm: ";
+
+    IColorSelector* selector = nullptr;
     switch(selectionAlgorithm) {
         case SA_CLOSEST_EUCLID:
+            std::cout << "Closest Euclidian";
             selector = new ClosestEuclidian(palette, space);
             break;
         case SA_CLOSEST_LINE:
+            std::cout << "Closest Mix" << std::endl;
             selector = new ClosestLine(palette, space);
             break;
         case SA_CLOSEST_PARTITION:
+            std::cout << "Closest Partition" << std::endl;
             selector = new ClosestPartition(palette, space);
             break;
         case SA_CLOSEST_TRI:
+            std::cout << "Brightness Partition" << std::endl;
             selector = new BrightnessPartition(palette);
             break;
     }
+    std::cout << std::endl;
+
 
     for(int y = 0; y < image.height(); y++) {
-        for(int x = 1; x < image.width(); x++) {
+        if(y % (image.height() / 10) == 0) {
+            float progress = float(y) / image.height() * 100.f;
+            std::cout << "Progress: " << progress << "%\n";
+        }
+        for(int x = 0; x < image.width(); x++) {
             glm::vec3 src = image.get(x, y);
             glm::vec3 dest = selector->select(src);
             image.set(x, y, dest);
         }
     }
+    std::cout << std::endl;
 
     image.writeToFile(outFile);
 }
