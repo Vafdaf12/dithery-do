@@ -56,12 +56,39 @@ enum class SelectionAlgo {
 };
 
 
-int main(int argc, char** argv) {
-    CLI::App app{"This is a CLI utility"};
+std::ostream& operator<<(std::ostream& out, const ColorSpace& space) {
+    switch(space) {
+        case ColorSpace::Rgb:
+            return (out << "RGB");
+        case ColorSpace::Xyz:
+            return (out << "XYZ");
+        case ColorSpace::Lab:
+            return (out << "L*a*b (D50)");
+    }
+    return out;
+}
+std::ostream& operator<<(std::ostream& out, const SelectionAlgo& space) {
+    switch(space) {
+        case SelectionAlgo::ClosestEuclidian:
+            return (out << "Closest Euclidian");
+        case SelectionAlgo::ClosestMix:
+            return (out << "Closest Mix");
+        case SelectionAlgo::ClosestPartition:
+            return (out << "Closest Partition");
+        case SelectionAlgo::BrightnessPartition:
+            return (out << "Closest Euclidian");
+    }
+    return out;
+}
 
-    std::string inFile = "";
-    std::string outFile = "output.jpg";
-    std::string paletteFile = "palette.txt";
+
+int main(int argc, char** argv) {
+    CLI::App app{"A tool to \"paint\" images just like an artist would "};
+
+    std::string inFile;
+    std::string outFile;
+    std::string paletteFile;
+
     ColorSpace colorSpace = ColorSpace::Rgb;
     SelectionAlgo selectionAlgorithm = SelectionAlgo::ClosestEuclidian;
 
@@ -73,18 +100,19 @@ int main(int argc, char** argv) {
         ->required(true)
         ->check(CLI::ExistingFile);
 
-    app.add_option("--color-space", colorSpace, "The color space to use for selection");
-    app.add_option("--select", selectionAlgorithm, "The color selection algorithm to use");
+    app.add_option("-o, --output", outFile, "The output image")
+        ->required(true);
 
-    app.add_option("-o, --output", outFile, "The output image");
-
+    app.add_option("--space", colorSpace, "The color space to use (Default: RGB)");
+    app.add_option("--select", selectionAlgorithm, "The selection algorithm to use (Default: Closest Euclidian)");
 
     CLI11_PARSE(app, argc, argv);
 
     int w, h, n;
 
-
     std::cout << inFile << " -> " << outFile << std::endl;
+    std::cout << "Colour Space: " << colorSpace << std::endl;
+    std::cout << "Selection Algorithm: " << selectionAlgorithm << std::endl;
 
     Image image;
     Palette palette;
@@ -95,41 +123,30 @@ int main(int argc, char** argv) {
     std::cout << palette << std::endl;
 
     IColorSpace* space;
-    std::cout << "Colour Space: ";
     switch(colorSpace) {
         case ColorSpace::Rgb:
-            std::cout << "RGB";
             space = nullptr;
             break;
         case ColorSpace::Xyz:
-            std::cout << "XYZ";
             space = new XyzColorSpace;
             break;
         case ColorSpace::Lab:
-            std::cout << "L*a*b (D50)";
             space = new LabColorSpace(LabColorSpace::D50);
             break;
     }
-    std::cout << std::endl;
-
-    std::cout << "Algorithm: ";
 
     IColorSelector* selector = nullptr;
     switch(selectionAlgorithm) {
         case SelectionAlgo::ClosestEuclidian:
-            std::cout << "Closest Euclidian";
             selector = new ClosestEuclidian(palette, space);
             break;
         case SelectionAlgo::ClosestMix:
-            std::cout << "Closest Mix" << std::endl;
             selector = new ClosestLine(palette, space);
             break;
         case SelectionAlgo::ClosestPartition:
-            std::cout << "Closest Partition" << std::endl;
             selector = new ClosestPartition(palette, space);
             break;
         case SelectionAlgo::BrightnessPartition:
-            std::cout << "Brightness Partition" << std::endl;
             selector = new BrightnessPartition(palette);
             break;
     }
