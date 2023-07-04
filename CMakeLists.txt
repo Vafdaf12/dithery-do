@@ -4,11 +4,9 @@ project(DitheryDo)
 include(FetchContent)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS_DEBUG "-O0")
-set(CMAKE_C_FLAGS_DEBUG "-O0")
 
 set(NAME_EXE ${PROJECT_NAME})
 
@@ -34,9 +32,10 @@ file(GLOB SRCFILES
     src/stb/*.cpp
     src/select/*.cpp
     src/color/*.cpp
+    src/vulkan/*.cpp
 )
 
 add_executable(${NAME_EXE} ${SRCFILES})
-target_link_libraries(${NAME_EXE} CLI11::CLI11 glm)
+target_link_libraries(${NAME_EXE} CLI11::CLI11 glm vulkan)
 
 

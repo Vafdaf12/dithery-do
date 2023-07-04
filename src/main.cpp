@@ -21,6 +21,7 @@
 
 #include "Image.h"
 #include "Palette.h"
+#include "vulkan/Vulkan.h"
 
 void diffuse_steinberg(Image& img, const glm::vec3& err, int x, int y) {
     glm::vec3 pix, i;
@@ -83,6 +84,9 @@ std::ostream& operator<<(std::ostream& out, const SelectionAlgo& space) {
 
 
 int main(int argc, char** argv) {
+    Vulkan app;
+    app.run();
+    /*
     CLI::App app{"A tool to \"paint\" images just like an artist would "};
 
     std::string inFile;
@@ -167,4 +171,5 @@ int main(int argc, char** argv) {
     std::cout << std::endl;
 
     image.writeToFile(outFile);
+    */
 }
