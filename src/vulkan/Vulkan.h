@@ -7,5 +7,8 @@ public:
     void run();
 
 private:
+    void createInstance();
+    void cleanup();
+
     VkInstance m_instance;
 };
