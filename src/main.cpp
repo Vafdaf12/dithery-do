@@ -42,17 +42,17 @@ void diffuse_steinberg(Image& img, const glm::vec3& err, int x, int y) {
     img.set(x+1, y+1, pix);
 }
 
-enum ColorSpace {
-    CS_RGB = 0,
-    CS_XYZ,
-    CS_LAB
+enum class ColorSpace {
+    Rgb,
+    Xyz,
+    Lab
 };
 
-enum SelectionAlgo {
-    SA_CLOSEST_EUCLID = 0,
-    SA_CLOSEST_LINE,
-    SA_CLOSEST_PARTITION,
-    SA_CLOSEST_TRI,
+enum class SelectionAlgo {
+    ClosestEuclidian = 0,
+    ClosestMix,
+    ClosestPartition,
+    BrightnessPartition
 };
 
 
@@ -62,8 +62,8 @@ int main(int argc, char** argv) {
     std::string inFile = "";
     std::string outFile = "output.jpg";
     std::string paletteFile = "palette.txt";
-    ColorSpace colorSpace = CS_RGB;
-    SelectionAlgo selectionAlgorithm = SA_CLOSEST_EUCLID;
+    ColorSpace colorSpace = ColorSpace::Rgb;
+    SelectionAlgo selectionAlgorithm = SelectionAlgo::ClosestEuclidian;
 
     app.add_option("-f, --file", inFile, "The input image")
         ->required(true)
@@ -97,15 +97,15 @@ int main(int argc, char** argv) {
     IColorSpace* space;
     std::cout << "Colour Space: ";
     switch(colorSpace) {
-        case CS_RGB:
+        case ColorSpace::Rgb:
             std::cout << "RGB";
             space = nullptr;
             break;
-        case CS_XYZ:
+        case ColorSpace::Xyz:
             std::cout << "XYZ";
             space = new XyzColorSpace;
             break;
-        case CS_LAB:
+        case ColorSpace::Lab:
             std::cout << "L*a*b (D50)";
             space = new LabColorSpace(LabColorSpace::D50);
             break;
@@ -116,19 +116,19 @@ int main(int argc, char** argv) {
 
     IColorSelector* selector = nullptr;
     switch(selectionAlgorithm) {
-        case SA_CLOSEST_EUCLID:
+        case SelectionAlgo::ClosestEuclidian:
             std::cout << "Closest Euclidian";
             selector = new ClosestEuclidian(palette, space);
             break;
-        case SA_CLOSEST_LINE:
+        case SelectionAlgo::ClosestMix:
             std::cout << "Closest Mix" << std::endl;
             selector = new ClosestLine(palette, space);
             break;
-        case SA_CLOSEST_PARTITION:
+        case SelectionAlgo::ClosestPartition:
             std::cout << "Closest Partition" << std::endl;
             selector = new ClosestPartition(palette, space);
             break;
-        case SA_CLOSEST_TRI:
+        case SelectionAlgo::BrightnessPartition:
             std::cout << "Brightness Partition" << std::endl;
             selector = new BrightnessPartition(palette);
             break;
