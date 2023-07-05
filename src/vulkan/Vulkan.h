@@ -1,14 +1,18 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include <vector>
+#include <vulkan/vulkan.hpp>
 
 class Vulkan {
 public:
     void run();
 
 private:
+    bool supportsLayers(const std::vector<const char*>& layers) const;
+    bool supportsExtensions(const std::vector<const char*>& layers) const;
+
     void createInstance();
     void cleanup();
 
-    VkInstance m_instance;
+    vk::Instance m_instance;
 };
