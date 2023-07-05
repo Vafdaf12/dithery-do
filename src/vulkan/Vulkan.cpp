@@ -1,6 +1,7 @@
 #include "Vulkan.h"
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 
@@ -17,6 +18,29 @@ constexpr bool ENABLE_VALIDATION = false;
 constexpr bool ENABLE_VALIDATION = true;
 #endif
 
+#define EXPECT(cond, message) if(!(cond)) throw std::runtime_error(message);
+
+struct QueueFamilyIndices {
+    std::optional<uint32_t> computeFamily;
+    bool isComplete() const {
+        return computeFamily.has_value();
+    }
+};
+QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device) {
+    QueueFamilyIndices indices;
+
+    std::vector<vk::QueueFamilyProperties> queueFamilies;
+    queueFamilies = device.getQueueFamilyProperties();
+    int i = 0;
+    for(const auto& family : queueFamilies) {
+        if(family.queueFlags & vk::QueueFlagBits::eCompute) {
+            indices.computeFamily = i;
+        }
+        i++;
+    }
+
+    return indices;
+}
 
 const std::vector<const char*> VALIDATION_LAYERS = {
     "VK_LAYER_KHRONOS_validation"
@@ -96,6 +120,7 @@ bool Vulkan::supportsExtensions(const std::vector<const char*>& layers) const {
 void Vulkan::run() {
     createInstance();
     if(ENABLE_VALIDATION) setupDebugMessenger();
+    pickPhysicalDevice();
     cleanup();
 }
 void Vulkan::createInstance() {
@@ -129,9 +154,8 @@ void Vulkan::createInstance() {
 
     VkInstance instance;
     VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
-    if(result != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create Vulkan Instance");
-    }
+    EXPECT(result == VK_SUCCESS, "Failed to create Vulkan Instance")
+
     m_instance = vk::Instance(instance);
 }
 
@@ -142,6 +166,23 @@ void Vulkan::setupDebugMessenger() {
     vk::ext::createDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &messenger);
     m_debugMessenger = vk::DebugUtilsMessengerEXT(messenger);
 }
+bool Vulkan::isDeviceSuitable(vk::PhysicalDevice device) const {
+    QueueFamilyIndices indices = findQueueFamilies(device);
+    return indices.isComplete();
+}
+void Vulkan::pickPhysicalDevice() {
+    std::vector<vk::PhysicalDevice> devices = m_instance.enumeratePhysicalDevices();
+    EXPECT(!devices.empty(), "No GPUs found with Vulkan support");
+
+    m_physicalDevice = VK_NULL_HANDLE;
+    for (const auto& device : devices) {
+        if(isDeviceSuitable(device)) {
+            m_physicalDevice = device;
+        }
+    }
+    EXPECT(m_physicalDevice, "No suitable GPUs found")
+}
+
 
 void Vulkan::cleanup() {
     vk::ext::destroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);

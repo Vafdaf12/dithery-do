@@ -11,11 +11,14 @@ public:
 private:
     bool supportsLayers(const std::vector<const char*>& layers) const;
     bool supportsExtensions(const std::vector<const char*>& layers) const;
+    bool isDeviceSuitable(vk::PhysicalDevice device) const;
 
     void createInstance();
     void setupDebugMessenger();
+    void pickPhysicalDevice();
     void cleanup();
 
     vk::Instance m_instance;
     vk::DebugUtilsMessengerEXT m_debugMessenger;
+    vk::PhysicalDevice m_physicalDevice;
 };
