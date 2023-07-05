@@ -4,9 +4,12 @@
 #include <stdexcept>
 #include <vector>
 
+#include <vulkan/vk_platform.h>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_handles.hpp>
+
+#include "vulkan_ext.h"
 
 #ifdef NDEBUG
 constexpr bool ENABLE_VALIDATION = false;
@@ -64,6 +67,7 @@ bool Vulkan::supportsExtensions(const std::vector<const char*>& layers) const {
 
 void Vulkan::run() {
     createInstance();
+    if(ENABLE_VALIDATION) setupDebugMessenger();
     cleanup();
 }
 void Vulkan::createInstance() {
@@ -100,6 +104,37 @@ void Vulkan::createInstance() {
     m_instance = vk::Instance(instance);
 }
 
+VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData
+) {
+    std::cout << "--- VALIDATION LAYER ---\n";
+    std::cout << pCallbackData->pMessage << std::endl;
+    return VK_FALSE;
+}
+void Vulkan::setupDebugMessenger() {
+    VkDebugUtilsMessengerCreateInfoEXT createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+    createInfo.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+    createInfo.pfnUserCallback = debugCallback;
+
+    VkDebugUtilsMessengerEXT messenger;
+    vk::ext::createDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &messenger);
+    m_debugMessenger = vk::DebugUtilsMessengerEXT(messenger);
+}
+
 void Vulkan::cleanup() {
+    vk::ext::destroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
     m_instance.destroy();
 }
