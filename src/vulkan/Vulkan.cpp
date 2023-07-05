@@ -75,12 +75,14 @@ void Vulkan::createInstance() {
             throw std::runtime_error("Requested Extensions not available");
         }
     }
-
-    vk::ApplicationInfo appInfo;
+    VkApplicationInfo appInfo{};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Dithery Do";
     appInfo.apiVersion = VK_API_VERSION_1_0;
 
-    vk::InstanceCreateInfo createInfo({}, &appInfo);
+    VkInstanceCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfo.pApplicationInfo = &appInfo;
 
     if(ENABLE_VALIDATION) {
         createInfo.enabledLayerCount = VALIDATION_LAYERS.size();
@@ -90,11 +92,14 @@ void Vulkan::createInstance() {
         createInfo.ppEnabledExtensionNames = EXTENSIONS.data();
     }
 
-    vk::Result result = vk::createInstance(&createInfo, nullptr, &m_instance);
-    if(result != vk::Result::eSuccess) {
+    VkInstance instance;
+    VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
+    if(result != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Vulkan Instance");
     }
+    m_instance = vk::Instance(instance);
 }
+
 void Vulkan::cleanup() {
     m_instance.destroy();
 }
