@@ -121,6 +121,7 @@ void Vulkan::run() {
     createInstance();
     if(ENABLE_VALIDATION) setupDebugMessenger();
     pickPhysicalDevice();
+    createLogicalDevice();
     cleanup();
 }
 void Vulkan::createInstance() {
@@ -183,8 +184,44 @@ void Vulkan::pickPhysicalDevice() {
     EXPECT(m_physicalDevice, "No suitable GPUs found")
 }
 
+void Vulkan::createLogicalDevice() {
+    QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+    float priority = 1.0f;
+
+    VkDeviceQueueCreateInfo queueCreateInfo{};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.queueFamilyIndex = indices.computeFamily.value();
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = &priority;
+
+    VkPhysicalDeviceFeatures deviceFeatures{};
+
+    VkDeviceCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pQueueCreateInfos = &queueCreateInfo;
+    createInfo.queueCreateInfoCount = 1;
+    createInfo.pEnabledFeatures = &deviceFeatures;
+
+    if(ENABLE_VALIDATION) {
+        createInfo.enabledLayerCount = VALIDATION_LAYERS.size();
+        createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
+    }
+
+    VkDevice device;
+    VkQueue queue;
+
+    VkResult res = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &device);
+    EXPECT(res == VK_SUCCESS, "Failed to create logical device")
+    vkGetDeviceQueue(m_device, indices.computeFamily.value(), 0, &queue);
+
+    m_device = vk::Device(device);
+    m_computeQueue = vk::Queue(queue);
+}
+
 
 void Vulkan::cleanup() {
+    m_device.destroy();
+
     vk::ext::destroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
     m_instance.destroy();
 }

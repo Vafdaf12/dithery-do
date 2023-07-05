@@ -16,9 +16,12 @@ private:
     void createInstance();
     void setupDebugMessenger();
     void pickPhysicalDevice();
+    void createLogicalDevice();
     void cleanup();
 
     vk::Instance m_instance;
     vk::DebugUtilsMessengerEXT m_debugMessenger;
     vk::PhysicalDevice m_physicalDevice;
+    vk::Device m_device;
+    vk::Queue m_computeQueue;
 };
