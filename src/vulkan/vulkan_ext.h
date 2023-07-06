@@ -1,6 +1,6 @@
 #include <vulkan/vulkan_core.h>
 
-namespace vk::ext {
+namespace vk {
     VkResult createDebugUtilsMessengerEXT(
         VkInstance instance,
         const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,

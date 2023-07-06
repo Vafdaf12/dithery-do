@@ -1,15 +1,14 @@
 #include "Vulkan.h"
+
 #include <cstring>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <vector>
 
-#include <vulkan/vk_platform.h>
-#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_handles.hpp>
 
+#include "util.h"
 #include "vulkan_ext.h"
 
 #ifdef NDEBUG
@@ -26,14 +25,14 @@ struct QueueFamilyIndices {
         return computeFamily.has_value();
     }
 };
-QueueFamilyIndices findQueueFamilies(vk::PhysicalDevice device) {
+QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
     QueueFamilyIndices indices;
 
-    std::vector<vk::QueueFamilyProperties> queueFamilies;
-    queueFamilies = device.getQueueFamilyProperties();
+    std::vector<VkQueueFamilyProperties> queueFamilies;
+    queueFamilies = vk::getQueueFamilies(device);
     int i = 0;
     for(const auto& family : queueFamilies) {
-        if(family.queueFlags & vk::QueueFlagBits::eCompute) {
+        if(family.queueFlags & VK_QUEUE_COMPUTE_BIT) {
             indices.computeFamily = i;
         }
         i++;
@@ -80,8 +79,8 @@ VkDebugUtilsMessengerCreateInfoEXT debugMessengerInfo() {
 }
 
 bool Vulkan::supportsLayers(const std::vector<const char*>& layers) const {
-    std::vector<vk::LayerProperties> availableLayers;
-    availableLayers = vk::enumerateInstanceLayerProperties();
+    std::vector<VkLayerProperties> availableLayers;
+    availableLayers =  vk::getInstanceLayers();
 
     // check if all layers are supported
     // TODO: refactor to use C++ STL algorithms
@@ -99,8 +98,8 @@ bool Vulkan::supportsLayers(const std::vector<const char*>& layers) const {
 }
 
 bool Vulkan::supportsExtensions(const std::vector<const char*>& layers) const {
-    std::vector<vk::ExtensionProperties> availableExtensions;
-    availableExtensions = vk::enumerateInstanceExtensionProperties();
+    std::vector<VkExtensionProperties> availableExtensions;
+    availableExtensions = vk::getInstanceExtensions();
 
     // check if all layers are supported
     // TODO: refactor to use C++ STL algorithms
@@ -153,26 +152,21 @@ void Vulkan::createInstance() {
         createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &messengerCreateInfo;
     }
 
-    VkInstance instance;
-    VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
+    VkResult result = vkCreateInstance(&createInfo, nullptr, &m_instance);
     EXPECT(result == VK_SUCCESS, "Failed to create Vulkan Instance")
-
-    m_instance = vk::Instance(instance);
 }
 
 void Vulkan::setupDebugMessenger() {
     VkDebugUtilsMessengerCreateInfoEXT createInfo = debugMessengerInfo();
 
-    VkDebugUtilsMessengerEXT messenger;
-    vk::ext::createDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &messenger);
-    m_debugMessenger = vk::DebugUtilsMessengerEXT(messenger);
+    vk::createDebugUtilsMessengerEXT(m_instance, &createInfo, nullptr, &m_debugMessenger);
 }
-bool Vulkan::isDeviceSuitable(vk::PhysicalDevice device) const {
+bool Vulkan::isDeviceSuitable(VkPhysicalDevice device) const {
     QueueFamilyIndices indices = findQueueFamilies(device);
     return indices.isComplete();
 }
 void Vulkan::pickPhysicalDevice() {
-    std::vector<vk::PhysicalDevice> devices = m_instance.enumeratePhysicalDevices();
+    std::vector<VkPhysicalDevice> devices = vk::getPhysicalDevices(m_instance);
     EXPECT(!devices.empty(), "No GPUs found with Vulkan support");
 
     m_physicalDevice = VK_NULL_HANDLE;
@@ -186,6 +180,8 @@ void Vulkan::pickPhysicalDevice() {
 
 void Vulkan::createLogicalDevice() {
     QueueFamilyIndices indices = findQueueFamilies(m_physicalDevice);
+    EXPECT(indices.isComplete(), "Missing queue families")
+
     float priority = 1.0f;
 
     VkDeviceQueueCreateInfo queueCreateInfo{};
@@ -207,21 +203,15 @@ void Vulkan::createLogicalDevice() {
         createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
     }
 
-    VkDevice device;
-    VkQueue queue;
-
-    VkResult res = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &device);
+    VkResult res = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device);
     EXPECT(res == VK_SUCCESS, "Failed to create logical device")
-    vkGetDeviceQueue(m_device, indices.computeFamily.value(), 0, &queue);
-
-    m_device = vk::Device(device);
-    m_computeQueue = vk::Queue(queue);
+    vkGetDeviceQueue(m_device, indices.computeFamily.value(), 0, &m_computeQueue);
 }
 
 
 void Vulkan::cleanup() {
-    m_device.destroy();
+    vkDestroyDevice(m_device, nullptr);
 
-    vk::ext::destroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
-    m_instance.destroy();
+    vk::destroyDebugUtilsMessengerEXT(m_instance, m_debugMessenger, nullptr);
+    vkDestroyInstance(m_instance, nullptr);
 }

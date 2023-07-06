@@ -1,8 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <vulkan/vk_platform.h>
-#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_core.h>
 
 class Vulkan {
 public:
@@ -11,7 +10,7 @@ public:
 private:
     bool supportsLayers(const std::vector<const char*>& layers) const;
     bool supportsExtensions(const std::vector<const char*>& layers) const;
-    bool isDeviceSuitable(vk::PhysicalDevice device) const;
+    bool isDeviceSuitable(VkPhysicalDevice device) const;
 
     void createInstance();
     void setupDebugMessenger();
@@ -19,9 +18,9 @@ private:
     void createLogicalDevice();
     void cleanup();
 
-    vk::Instance m_instance;
-    vk::DebugUtilsMessengerEXT m_debugMessenger;
-    vk::PhysicalDevice m_physicalDevice;
-    vk::Device m_device;
-    vk::Queue m_computeQueue;
+    VkInstance m_instance;
+    VkDebugUtilsMessengerEXT m_debugMessenger;
+    VkPhysicalDevice m_physicalDevice;
+    VkDevice m_device;
+    VkQueue m_computeQueue;
 };
