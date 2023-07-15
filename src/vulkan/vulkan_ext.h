@@ -9,9 +9,11 @@
 namespace vk::ext {
 struct QueueFamilyIndices {
   std::optional<uint32_t> computeFamily;
+  std::optional<uint32_t> transferFamily;
+
 
   inline bool isComplete() const {
-      return computeFamily.has_value();
+      return computeFamily.has_value() && transferFamily.has_value();
   }
 };
 

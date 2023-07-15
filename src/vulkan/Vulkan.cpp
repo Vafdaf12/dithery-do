@@ -3,13 +3,17 @@
 #include <cstring>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <vector>
 
 #include <vulkan/vulkan_core.h>
 
+#include "util/StagingBuffer.h"
 #include "vulkan_ext.h"
 #include "vulkan_wrapper.h"
+
+#include "../stb/stb_image.h"
 
 #ifdef NDEBUG
 constexpr bool ENABLE_VALIDATION = false;
@@ -24,7 +28,9 @@ void Vulkan::run() {
     createInstance();
     pickPhysicalDevice();
     createLogicalDevice();
-    createComputePipeline();
+
+    createCommandPool();
+
     cleanup();
 }
 void Vulkan::createInstance() {
@@ -66,6 +72,16 @@ void Vulkan::createComputePipeline() {
 
     vkDestroyShaderModule(m_device, module, nullptr);
 }
+void Vulkan::createCommandPool() {
+    auto families = vk::ext::queryQueueFamilies(m_physicalDevice);
+
+    m_transferCommandPool = vk::ext::createCommandPool(m_device,
+        families.transferFamily.value(),
+        VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
+    m_computeCommandPool = vk::ext::createCommandPool(m_device,
+        families.computeFamily.value(),
+        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+}
 bool Vulkan::isDeviceSuitable(VkPhysicalDevice device) const {
     auto indices = vk::ext::queryQueueFamilies(device);
     return indices.isComplete();
@@ -88,18 +104,27 @@ void Vulkan::createLogicalDevice() {
 
     float priority = 1.0f;
 
-    VkDeviceQueueCreateInfo queueCreateInfo{};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.queueFamilyIndex = indices.computeFamily.value();
-    queueCreateInfo.queueCount = 1;
-    queueCreateInfo.pQueuePriorities = &priority;
+    std::set<uint32_t> uniqueFamilies = {
+        indices.computeFamily.value(),
+        indices.transferFamily.value()
+    };
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    for(uint32_t idx : uniqueFamilies) {
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = idx;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &priority;
+
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
 
     VkPhysicalDeviceFeatures deviceFeatures{};
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos = &queueCreateInfo;
-    createInfo.queueCreateInfoCount = 1;
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.queueCreateInfoCount = queueCreateInfos.size();
     createInfo.pEnabledFeatures = &deviceFeatures;
 
     if (ENABLE_VALIDATION) {
@@ -113,10 +138,15 @@ void Vulkan::createLogicalDevice() {
 
     vkGetDeviceQueue(
         m_device, indices.computeFamily.value(), 0, &m_computeQueue);
+    vkGetDeviceQueue(
+        m_device, indices.transferFamily.value(), 0, &m_computeQueue);
 }
 
 void Vulkan::cleanup() {
-    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-    vkDestroyPipeline(m_device, m_pipeline, nullptr);
+    // vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
+    // vkDestroyPipeline(m_device, m_pipeline, nullptr);
+    //
+    vkDestroyCommandPool(m_device, m_computeCommandPool, nullptr);
+    vkDestroyCommandPool(m_device, m_transferCommandPool, nullptr);
     vkDestroyDevice(m_device, nullptr);
 }

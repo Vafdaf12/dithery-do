@@ -16,6 +16,9 @@ QueueFamilyIndices queryQueueFamilies(VkPhysicalDevice device) {
     if (family.queueFlags & VK_QUEUE_COMPUTE_BIT) {
       indices.computeFamily = i;
     }
+    if(family.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+      indices.transferFamily = i;
+    }
 
     i++;
   }
