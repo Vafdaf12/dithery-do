@@ -29,7 +29,10 @@ void Vulkan::run() {
     pickPhysicalDevice();
     createLogicalDevice();
 
+    m_memoryPool = vk::ext::MemoryPool(m_physicalDevice, m_device);
+
     createCommandPool();
+    createImages();
 
     cleanup();
 }
@@ -82,6 +85,19 @@ void Vulkan::createCommandPool() {
         families.computeFamily.value(),
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 }
+void Vulkan::createImages() {
+    m_memoryPool.createImage(WIDTH,
+        HEIGHT,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        m_destImage,
+        m_destImageMemory);
+
+    m_destImageView = vk::ext::createImageView(
+        m_device, m_destImage, VK_FORMAT_R8G8B8A8_UNORM);
+}
 bool Vulkan::isDeviceSuitable(VkPhysicalDevice device) const {
     auto indices = vk::ext::queryQueueFamilies(device);
     return indices.isComplete();
@@ -105,11 +121,9 @@ void Vulkan::createLogicalDevice() {
     float priority = 1.0f;
 
     std::set<uint32_t> uniqueFamilies = {
-        indices.computeFamily.value(),
-        indices.transferFamily.value()
-    };
+        indices.computeFamily.value(), indices.transferFamily.value()};
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    for(uint32_t idx : uniqueFamilies) {
+    for (uint32_t idx : uniqueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = idx;
@@ -143,9 +157,9 @@ void Vulkan::createLogicalDevice() {
 }
 
 void Vulkan::cleanup() {
-    // vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
-    // vkDestroyPipeline(m_device, m_pipeline, nullptr);
-    //
+    vkDestroyImageView(m_device, m_destImageView, nullptr);
+
+    m_memoryPool.destroy();
     vkDestroyCommandPool(m_device, m_computeCommandPool, nullptr);
     vkDestroyCommandPool(m_device, m_transferCommandPool, nullptr);
     vkDestroyDevice(m_device, nullptr);

@@ -11,6 +11,9 @@ public:
     void run();
 
 private:
+    static constexpr uint32_t WIDTH = 200;
+    static constexpr uint32_t HEIGHT = 100;
+
     bool isDeviceSuitable(VkPhysicalDevice device) const;
 
     // Initial setup
@@ -20,10 +23,12 @@ private:
     void createLogicalDevice();
 
     void createCommandPool();
+    void createImages();
 
     void cleanup();
 
     vk::ext::Instance m_instance;
+    vk::ext::MemoryPool m_memoryPool;
 
     VkPipelineLayout m_pipelineLayout;
     VkPipeline m_pipeline;
@@ -36,4 +41,8 @@ private:
 
     VkCommandPool m_transferCommandPool;
     VkCommandPool m_computeCommandPool;
+
+    VkImage m_destImage;
+    VkImageView m_destImageView;
+    VkDeviceMemory m_destImageMemory;
 };
