@@ -4,3 +4,6 @@
 # Build files generate by CMake
 build/
 
+# Temporary files used during development
+tmp/
+

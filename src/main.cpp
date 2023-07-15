@@ -1,3 +1,4 @@
+/*
 #include "color/LabColorSpace.h"
 #include "color/XyzColorSpace.h"
 
@@ -18,29 +19,38 @@
 
 #include <string>
 #include <iostream>
-
 #include "Image.h"
 #include "Palette.h"
+*/
 #include "vulkan/Vulkan.h"
 
+/*
 void diffuse_steinberg(Image& img, const glm::vec3& err, int x, int y) {
     glm::vec3 pix, i;
 
-    i = img.get(x+1, y);
-    pix = i + err * (7 / 16.f);
-    img.set(x+1, y, pix);
+    if(x < img.width()-1) {
+        i = img.get(x+1, y);
+        pix = i + err * (7 / 16.f);
+        img.set(x+1, y, pix);
+    }
 
-    i = img.get(x-1, y+1);
-    pix = i + err * (3 / 16.f);
-    img.set(x-1, y+1, pix);
+    if(x > 0 && y < img.height()-1) {
+        i = img.get(x-1, y+1);
+        pix = i + err * (3 / 16.f);
+        img.set(x-1, y+1, pix);
+    }
 
-    i = img.get(x, y+1);
-    pix = i + err * (5 / 16.f);
-    img.set(x, y+1, pix);
+    if(y < img.height() - 1) {
+        i = img.get(x, y+1);
+        pix = i + err * (5 / 16.f);
+        img.set(x, y+1, pix);
+    }
 
-    i = img.get(x+1, y+1);
-    pix = i + err * (1 / 16.f);
-    img.set(x+1, y+1, pix);
+    if(x < img.width()-1 && y < img.height()-1) {
+        i = img.get(x+1, y+1);
+        pix = i + err * (1 / 16.f);
+        img.set(x+1, y+1, pix);
+    }
 }
 
 enum class ColorSpace {
@@ -82,7 +92,7 @@ std::ostream& operator<<(std::ostream& out, const SelectionAlgo& space) {
     return out;
 }
 
-
+*/
 int main(int argc, char** argv) {
     Vulkan app;
     app.run();

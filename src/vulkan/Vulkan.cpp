@@ -8,8 +8,8 @@
 
 #include <vulkan/vulkan_core.h>
 
-#include "vulkan_wrapper.h"
 #include "vulkan_ext.h"
+#include "vulkan_wrapper.h"
 
 #ifdef NDEBUG
 constexpr bool ENABLE_VALIDATION = false;
@@ -18,13 +18,13 @@ constexpr bool ENABLE_VALIDATION = true;
 #endif
 
 const std::vector<const char*> VALIDATION_LAYERS = {
-    "VK_LAYER_KHRONOS_validation"
-};
+    "VK_LAYER_KHRONOS_validation"};
 
 void Vulkan::run() {
     createInstance();
     pickPhysicalDevice();
     createLogicalDevice();
+    createComputePipeline();
     cleanup();
 }
 void Vulkan::createInstance() {
@@ -36,6 +36,36 @@ void Vulkan::createInstance() {
     m_instance = vk::ext::Instance(appInfo);
 }
 
+void Vulkan::createComputePipeline() {
+    auto src = util::readFile("res/comp.spv");
+    auto module = vk::createShaderModule(m_device, src);
+
+    VkPipelineShaderStageCreateInfo shaderStage{};
+    shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStage.module = module;
+    shaderStage.pName = "main";
+
+    VkPipelineLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+
+    VkResult result = vkCreatePipelineLayout(
+        m_device, &layoutInfo, nullptr, &m_pipelineLayout);
+    EXPECT_VK(result, "Failed to create pipeline layout")
+
+    VkComputePipelineCreateInfo computeInfo{};
+    computeInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computeInfo.layout = m_pipelineLayout;
+    computeInfo.basePipelineHandle = VK_NULL_HANDLE;
+    computeInfo.basePipelineIndex = -1;
+    computeInfo.stage = shaderStage;
+
+    VkResult res = vkCreateComputePipelines(
+        m_device, VK_NULL_HANDLE, 1, &computeInfo, nullptr, &m_pipeline);
+    EXPECT_VK(res, "Failed to create compute pipeline");
+
+    vkDestroyShaderModule(m_device, module, nullptr);
+}
 bool Vulkan::isDeviceSuitable(VkPhysicalDevice device) const {
     auto indices = vk::ext::queryQueueFamilies(device);
     return indices.isComplete();
@@ -46,7 +76,7 @@ void Vulkan::pickPhysicalDevice() {
 
     m_physicalDevice = VK_NULL_HANDLE;
     for (const auto& device : devices) {
-        if(isDeviceSuitable(device)) {
+        if (isDeviceSuitable(device)) {
             m_physicalDevice = device;
         }
     }
@@ -55,7 +85,6 @@ void Vulkan::pickPhysicalDevice() {
 
 void Vulkan::createLogicalDevice() {
     auto indices = vk::ext::queryQueueFamilies(m_physicalDevice);
-    EXPECT(indices.isComplete(), "Missing queue families")
 
     float priority = 1.0f;
 
@@ -73,16 +102,21 @@ void Vulkan::createLogicalDevice() {
     createInfo.queueCreateInfoCount = 1;
     createInfo.pEnabledFeatures = &deviceFeatures;
 
-    if(ENABLE_VALIDATION) {
+    if (ENABLE_VALIDATION) {
         createInfo.enabledLayerCount = VALIDATION_LAYERS.size();
         createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
     }
 
-    VkResult res = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device);
+    VkResult res =
+        vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_device);
     EXPECT(res == VK_SUCCESS, "Failed to create logical device")
-    vkGetDeviceQueue(m_device, indices.computeFamily.value(), 0, &m_computeQueue);
+
+    vkGetDeviceQueue(
+        m_device, indices.computeFamily.value(), 0, &m_computeQueue);
 }
 
 void Vulkan::cleanup() {
+    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
+    vkDestroyPipeline(m_device, m_pipeline, nullptr);
     vkDestroyDevice(m_device, nullptr);
 }
