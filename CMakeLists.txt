@@ -33,6 +33,7 @@ file(GLOB SRCFILES
     src/select/*.cpp
     src/color/*.cpp
     src/vulkan/*.cpp
+    src/vulkan/util/*.cpp
 )
 
 add_executable(${NAME_EXE} ${SRCFILES})
