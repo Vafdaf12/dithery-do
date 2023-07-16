@@ -6,15 +6,19 @@
 
 namespace vk::ext {
 
-MemoryPool::MemoryPool(VkPhysicalDevice physicalDevice, VkDevice device)
+DevicePool::DevicePool(VkPhysicalDevice physicalDevice, VkDevice device)
     : m_physicalDevice(physicalDevice), m_device(device) {}
 
-MemoryPool::~MemoryPool() { destroy(); }
+DevicePool::~DevicePool() { destroy(); }
 
-void MemoryPool::destroy() {
+void DevicePool::destroy() {
     while (!m_buffers.empty()) {
         vkDestroyBuffer(m_device, m_buffers.top(), nullptr);
         m_buffers.pop();
+    }
+    while (!m_imageViews.empty()) {
+        vkDestroyImageView(m_device, m_imageViews.top(), nullptr);
+        m_imageViews.pop();
     }
     while (!m_images.empty()) {
         vkDestroyImage(m_device, m_images.top(), nullptr);
@@ -27,66 +31,57 @@ void MemoryPool::destroy() {
     }
 }
 
-void MemoryPool::createBuffer(VkDeviceSize size,
-    VkBufferUsageFlags usage,
-    VkMemoryPropertyFlags properties,
-    VkBuffer& buffer,
-    VkDeviceMemory& memory) {
+VkResult DevicePool::allocBuffer(
+    VkBuffer buffer, VkMemoryPropertyFlags properties, VkDeviceMemory& memory, bool include) {
 
-    VkResult result = createBufferRaw(size, usage, properties, buffer, memory);
-    EXPECT_VK(result, "Failed to create + allocate buffer");
+    VkMemoryRequirements memRequirements{};
+    vkGetBufferMemoryRequirements(m_device, buffer, &memRequirements);
 
-    m_buffers.push(buffer);
-    m_deviceMemory.push(memory);
+    VkResult result = allocateRaw(memRequirements, properties, memory);
+    if (result != VK_SUCCESS) return result;
+
+    result = vkBindBufferMemory(m_device, buffer, memory, 0);
+    if (result != VK_SUCCESS) return result;
+
+    if(include) m_deviceMemory.push(memory);
+    return result;
 }
+VkResult DevicePool::allocImage(
+    VkImage image, VkMemoryPropertyFlags properties, VkDeviceMemory& memory, bool include) {
 
-VkResult MemoryPool::createBufferRaw(VkDeviceSize size,
-    VkBufferUsageFlags usage,
-    VkMemoryPropertyFlags properties,
-    VkBuffer& buffer,
-    VkDeviceMemory& memory) const {
+    VkMemoryRequirements memRequirements{};
+    vkGetImageMemoryRequirements(m_device, image, &memRequirements);
+
+    VkResult result = allocateRaw(memRequirements, properties, memory);
+    if (result != VK_SUCCESS) return result;
+
+    result = vkBindImageMemory(m_device, image, memory, 0);
+    if (result != VK_SUCCESS) return result;
+
+    if(include) m_deviceMemory.push(memory);
+    return result;
+}
+VkResult DevicePool::createBuffer(
+    VkDeviceSize size, VkBufferUsageFlags usage, VkBuffer& buffer, bool include) {
     VkBufferCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     createInfo.size = size;
-    createInfo.usage = usage;
     createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createInfo.usage = usage;
 
     VkResult res = vkCreateBuffer(m_device, &createInfo, nullptr, &buffer);
     if (res != VK_SUCCESS) return res;
 
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(m_device, buffer, &memRequirements);
-
-    res = allocateMemory(memRequirements, properties, memory);
-    if (res != VK_SUCCESS) return res;
-
-    return vkBindBufferMemory(m_device, buffer, memory, 0);
+    if(include) m_buffers.push(buffer);
+    return res;
 }
-
-void MemoryPool::createImage(uint32_t width,
+VkResult DevicePool::createImage(uint32_t width,
     uint32_t height,
     VkFormat format,
     VkImageTiling tiling,
     VkImageUsageFlags usage,
-    VkMemoryPropertyFlags properties,
-    VkImage& image,
-    VkDeviceMemory& imageMemory) {
+    VkImage& image, bool include) {
 
-    VkResult result = createImageRaw(
-        width, height, format, tiling, usage, properties, image, imageMemory);
-    EXPECT_VK(result, "Failed to create + allocate image");
-
-    m_images.push(image);
-    m_deviceMemory.push(imageMemory);
-}
-VkResult MemoryPool::createImageRaw(uint32_t width,
-    uint32_t height,
-    VkFormat format,
-    VkImageTiling tiling,
-    VkImageUsageFlags usage,
-    VkMemoryPropertyFlags properties,
-    VkImage& image,
-    VkDeviceMemory& imageMemory) const {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -106,19 +101,43 @@ VkResult MemoryPool::createImageRaw(uint32_t width,
     VkResult result = vkCreateImage(m_device, &imageInfo, nullptr, &image);
     if (result != VK_SUCCESS) return result;
 
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(m_device, image, &memRequirements);
+    if(include) m_images.push(image);
+    return result;
+}
+VkResult DevicePool::createImageView(
+    VkImage image, VkFormat format, VkImageView& view, bool include) 
+{
+    VkImageViewCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    createInfo.image = image;
 
-    result = allocateMemory(memRequirements, properties, imageMemory);
-    if (result != VK_SUCCESS) return result;
+    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    createInfo.format = format;
 
-    return vkBindImageMemory(m_device, image, imageMemory, 0);
+    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    createInfo.subresourceRange.baseMipLevel = 0;
+    createInfo.subresourceRange.levelCount = 1;
+    createInfo.subresourceRange.baseArrayLayer = 0;
+    createInfo.subresourceRange.layerCount = 1;
+
+    VkResult res = vkCreateImageView(m_device, &createInfo, nullptr, &view);
+    if(res != VK_SUCCESS) return res;
+
+    if(include) m_imageViews.push(view);
+
+    return res;
 }
 
-VkResult MemoryPool::allocateMemory(VkMemoryRequirements requirements,
+VkResult DevicePool::allocateRaw(VkMemoryRequirements requirements,
     VkMemoryPropertyFlags props,
     VkDeviceMemory& memory) const {
     VkMemoryAllocateInfo allocInfo{};
+
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = requirements.size;
     allocInfo.memoryTypeIndex =
@@ -126,7 +145,7 @@ VkResult MemoryPool::allocateMemory(VkMemoryRequirements requirements,
 
     return vkAllocateMemory(m_device, &allocInfo, nullptr, &memory);
 }
-uint32_t MemoryPool::findMemoryType(
+uint32_t DevicePool::findMemoryType(
     uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memProperties);

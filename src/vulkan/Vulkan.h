@@ -37,7 +37,7 @@ private:
     void submitTransferBuffer(VkCommandBuffer buffer);
 
     vk::ext::Instance m_instance;
-    vk::ext::MemoryPool m_memoryPool;
+    vk::ext::DevicePool m_memoryPool;
 
     VkPipelineLayout m_pipelineLayout;
     VkPipeline m_pipeline;

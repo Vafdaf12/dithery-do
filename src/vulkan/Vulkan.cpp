@@ -30,7 +30,7 @@ void Vulkan::run() {
     pickPhysicalDevice();
     createLogicalDevice();
 
-    m_memoryPool = vk::ext::MemoryPool(m_physicalDevice, m_device);
+    m_memoryPool = vk::ext::DevicePool(m_physicalDevice, m_device);
     createComputePipeline();
     createCommandPool();
     createSourceImage();
@@ -182,16 +182,24 @@ void Vulkan::createSourceImage() {
     m_imageSize = w * h * 4;
     EXPECT(pPixels, "Failed to load image")
 
-    m_memoryPool.createImage(w,
+    VkResult res;
+    res = m_memoryPool.createImage(w,
         h,
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        m_sourceImage);
+    EXPECT_VK(res, "Failed to create image")
+
+
+    res = m_memoryPool.allocImage(m_sourceImage,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        m_sourceImage,
         m_sourceImageMemory);
-    m_sourceImageView = vk::ext::createImageView(
-        m_device, m_sourceImage, VK_FORMAT_R8G8B8A8_UNORM);
+    EXPECT_VK(res, "Failed to allocate image")
+
+    res = m_memoryPool.createImageView(
+        m_sourceImage, VK_FORMAT_R8G8B8A8_UNORM, m_sourceImageView);
+    EXPECT_VK(res, "Failed to create image view")
 
     VkCommandBuffer cmdBuffer = beginTransferBuffer();
 
@@ -272,7 +280,6 @@ void Vulkan::createLogicalDevice() {
 }
 
 void Vulkan::cleanup() {
-    vkDestroyImageView(m_device, m_sourceImageView, nullptr);
     vkDestroyPipeline(m_device, m_pipeline, nullptr);
     vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
 

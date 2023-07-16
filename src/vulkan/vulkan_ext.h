@@ -8,26 +8,32 @@
 
 namespace vk::ext {
 struct QueueFamilyIndices {
-  std::optional<uint32_t> computeFamily;
-  std::optional<uint32_t> transferFamily;
+    std::optional<uint32_t> computeFamily;
+    std::optional<uint32_t> transferFamily;
 
-
-  inline bool isComplete() const {
-      return computeFamily.has_value() && transferFamily.has_value();
-  }
+    inline bool isComplete() const {
+        return computeFamily.has_value() && transferFamily.has_value();
+    }
 };
 
 QueueFamilyIndices queryQueueFamilies(VkPhysicalDevice device);
 
-bool instanceLayersSupported(const std::vector<const char *> &layers);
-bool instanceExtensionsSupported(const std::vector<const char *> &extensions);
-bool deviceExtensionsSupported(VkPhysicalDevice device,
-                               const std::vector<const char *> &extensions);
+bool instanceLayersSupported(const std::vector<const char*>& layers);
+bool instanceExtensionsSupported(const std::vector<const char*>& extensions);
+bool deviceExtensionsSupported(
+    VkPhysicalDevice device, const std::vector<const char*>& extensions);
 VkViewport viewportFromExtent(VkExtent2D extent);
 VkRect2D rectFromExtent(VkExtent2D extent);
 
-VkCommandPool createCommandPool(VkDevice device, uint32_t queueFamily,
-                                VkCommandPoolCreateFlags flags);
+VkCommandPool createCommandPool(
+    VkDevice device, uint32_t queueFamily, VkCommandPoolCreateFlags flags);
 
 VkImageView createImageView(VkDevice device, VkImage image, VkFormat format);
+
+VkBuffer createBuffer(
+    VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage);
+VkImage createImage(VkDevice device,
+    VkExtent2D size,
+    VkImageUsageFlags usage,
+    bool linear = false);
 } // namespace vk::ext

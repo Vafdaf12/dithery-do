@@ -5,41 +5,39 @@
 
 namespace vk::ext {
 
-class MemoryPool {
+class DevicePool {
 public:
-    MemoryPool() = default;
-    MemoryPool(VkPhysicalDevice physicalDevice, VkDevice device);
-    ~MemoryPool();
+    DevicePool() = default;
+    DevicePool(VkPhysicalDevice physicalDevice, VkDevice device);
+    ~DevicePool();
 
-    void createBuffer(VkDeviceSize size,
+    VkResult createBuffer(VkDeviceSize size,
         VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties,
         VkBuffer& buffer,
-        VkDeviceMemory& memory);
+        bool include = true);
 
-    VkResult createBufferRaw(VkDeviceSize size,
-        VkBufferUsageFlags usage,
+    VkResult createImage(uint32_t width,
+        uint32_t height,
+        VkFormat format,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
+        VkImage& image,
+        bool include = true);
+
+    VkResult createImageView(
+        VkImage image, VkFormat format, VkImageView& view, bool include = true);
+
+    VkResult allocBuffer(VkBuffer buffer,
         VkMemoryPropertyFlags properties,
-        VkBuffer& buffer,
+        VkDeviceMemory& memory, bool include = true);
+
+    VkResult allocImage(VkImage image,
+        VkMemoryPropertyFlags properties,
+        VkDeviceMemory& memory, bool include = true);
+
+    VkResult allocateRaw(VkMemoryRequirements requirements,
+        VkMemoryPropertyFlags properties,
         VkDeviceMemory& memory) const;
-
-    void createImage(uint32_t width,
-        uint32_t height,
-        VkFormat format,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties,
-        VkImage& image,
-        VkDeviceMemory& imageMemory);
-
-    VkResult createImageRaw(uint32_t width,
-        uint32_t height,
-        VkFormat format,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties,
-        VkImage& image,
-        VkDeviceMemory& imageMemory) const;
 
     void destroy();
     inline operator bool() const {
@@ -52,12 +50,9 @@ public:
         uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
 
 private:
-    VkResult allocateMemory(VkMemoryRequirements requirements,
-        VkMemoryPropertyFlags props,
-        VkDeviceMemory& memory) const;
-
     std::stack<VkBuffer> m_buffers;
     std::stack<VkImage> m_images;
+    std::stack<VkImageView> m_imageViews;
     std::stack<VkDeviceMemory> m_deviceMemory;
 
     VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;

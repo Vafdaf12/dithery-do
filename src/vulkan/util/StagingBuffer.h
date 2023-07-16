@@ -7,7 +7,7 @@
 namespace vk::ext {
 class StagingBuffer {
 public:
-    StagingBuffer(const MemoryPool& bufferPool, VkDeviceSize size);
+    StagingBuffer(DevicePool& bufferPool, VkDeviceSize size);
     ~StagingBuffer();
 
     void copyToBuffer(
