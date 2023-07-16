@@ -14,6 +14,7 @@
 #include "vulkan_wrapper.h"
 
 #include "../stb/stb_image.h"
+#include "../stb/stb_image_write.h"
 
 #ifdef NDEBUG
 constexpr bool ENABLE_VALIDATION = false;
@@ -30,9 +31,9 @@ void Vulkan::run() {
     createLogicalDevice();
 
     m_memoryPool = vk::ext::MemoryPool(m_physicalDevice, m_device);
-
+    createComputePipeline();
     createCommandPool();
-    createImages();
+    createSourceImage();
 
     cleanup();
 }
@@ -75,6 +76,41 @@ void Vulkan::createComputePipeline() {
 
     vkDestroyShaderModule(m_device, module, nullptr);
 }
+VkCommandBuffer Vulkan::beginTransferBuffer() const {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = m_transferCommandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer buffer;
+    VkResult result = vkAllocateCommandBuffers(m_device, &allocInfo, &buffer);
+    EXPECT_VK(result, "Failed to allocate transfer")
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    result = vkBeginCommandBuffer(buffer, &beginInfo);
+    EXPECT_VK(result, "Failed to begin transfer")
+
+    return buffer;
+}
+void Vulkan::submitTransferBuffer(VkCommandBuffer buffer) {
+    VkResult result = vkEndCommandBuffer(buffer);
+    EXPECT_VK(result, "Failed to end transfer")
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &buffer;
+
+    vkQueueSubmit(m_transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(m_transferQueue);
+
+    vkFreeCommandBuffers(m_device, m_transferCommandPool, 1, &buffer);
+}
+
 void Vulkan::createCommandPool() {
     auto families = vk::ext::queryQueueFamilies(m_physicalDevice);
 
@@ -85,18 +121,97 @@ void Vulkan::createCommandPool() {
         families.computeFamily.value(),
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 }
-void Vulkan::createImages() {
-    m_memoryPool.createImage(WIDTH,
-        HEIGHT,
+void Vulkan::transitionImageLayout(VkImage image,
+    VkFormat format,
+    VkImageLayout oldLayout,
+    VkImageLayout newLayout,
+    VkCommandBuffer cmdBuffer) {
+
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.image = image;
+
+    // Indicates transfer of layout
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+
+    // Not transferring queue family ownership
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    // What part of the image is affected by barrier
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags srcStage;
+    VkPipelineStageFlags dstStage;
+
+    // Transfer from uninitialized layout to layout
+    // optimized for writing to the image
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+        newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    // Image has loaded and is ready to be accessed
+    // by compute shader
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    } else {
+        throw std::invalid_argument("Unsupported layout transition");
+    }
+
+    vkCmdPipelineBarrier(
+        cmdBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+void Vulkan::createSourceImage() {
+    int w, h, n;
+    uint8_t* pPixels = stbi_load("res/robot.png", &w, &h, &n, 4);
+    m_imageSize = w * h * 4;
+    EXPECT(pPixels, "Failed to load image")
+
+    m_memoryPool.createImage(w,
+        h,
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        m_destImage,
-        m_destImageMemory);
+        m_sourceImage,
+        m_sourceImageMemory);
+    m_sourceImageView = vk::ext::createImageView(
+        m_device, m_sourceImage, VK_FORMAT_R8G8B8A8_UNORM);
 
-    m_destImageView = vk::ext::createImageView(
-        m_device, m_destImage, VK_FORMAT_R8G8B8A8_UNORM);
+    VkCommandBuffer cmdBuffer = beginTransferBuffer();
+
+    transitionImageLayout(m_sourceImage,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        cmdBuffer);
+
+    vk::ext::StagingBuffer stagingBuffer(m_memoryPool, m_imageSize);
+    stagingBuffer.write(pPixels);
+    stagingBuffer.copyToImage(m_sourceImage, w, h, cmdBuffer);
+
+    transitionImageLayout(m_sourceImage,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+        cmdBuffer);
+
+    submitTransferBuffer(cmdBuffer);
 }
 bool Vulkan::isDeviceSuitable(VkPhysicalDevice device) const {
     auto indices = vk::ext::queryQueueFamilies(device);
@@ -153,11 +268,13 @@ void Vulkan::createLogicalDevice() {
     vkGetDeviceQueue(
         m_device, indices.computeFamily.value(), 0, &m_computeQueue);
     vkGetDeviceQueue(
-        m_device, indices.transferFamily.value(), 0, &m_computeQueue);
+        m_device, indices.transferFamily.value(), 0, &m_transferQueue);
 }
 
 void Vulkan::cleanup() {
-    vkDestroyImageView(m_device, m_destImageView, nullptr);
+    vkDestroyImageView(m_device, m_sourceImageView, nullptr);
+    vkDestroyPipeline(m_device, m_pipeline, nullptr);
+    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
 
     m_memoryPool.destroy();
     vkDestroyCommandPool(m_device, m_computeCommandPool, nullptr);

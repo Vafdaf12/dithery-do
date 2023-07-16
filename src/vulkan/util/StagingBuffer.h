@@ -11,18 +11,14 @@ public:
     ~StagingBuffer();
 
     void copyToBuffer(
-        VkBuffer buffer, VkQueue queue, VkCommandPool commandPool);
+        VkBuffer buffer, VkCommandBuffer cmdBuffer);
     void copyToImage(VkImage image,
         uint32_t width,
         uint32_t height,
-        VkQueue queue,
-        VkCommandPool commandPool);
+        VkCommandBuffer cmdBuffer);
     void write(const void* data);
 
 private:
-    VkCommandBuffer beginCommandBuffer(VkCommandPool pool);
-    void submitCommandBuffer(
-        VkCommandBuffer cmdBuffer, VkCommandPool pool, VkQueue queue);
 
     void* m_pMapped;
     VkDeviceSize m_size;

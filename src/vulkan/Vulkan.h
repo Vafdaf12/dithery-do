@@ -18,14 +18,23 @@ private:
 
     // Initial setup
     void createInstance();
-    void createComputePipeline();
     void pickPhysicalDevice();
     void createLogicalDevice();
 
+    void createSourceImage();
     void createCommandPool();
-    void createImages();
+    void createComputePipeline();
 
     void cleanup();
+
+    void transitionImageLayout(VkImage image,
+        VkFormat format,
+        VkImageLayout oldLayout,
+        VkImageLayout newLayout,
+        VkCommandBuffer cmdBuffer);
+
+    VkCommandBuffer beginTransferBuffer() const;
+    void submitTransferBuffer(VkCommandBuffer buffer);
 
     vk::ext::Instance m_instance;
     vk::ext::MemoryPool m_memoryPool;
@@ -42,7 +51,9 @@ private:
     VkCommandPool m_transferCommandPool;
     VkCommandPool m_computeCommandPool;
 
-    VkImage m_destImage;
-    VkImageView m_destImageView;
-    VkDeviceMemory m_destImageMemory;
+    VkDeviceSize m_imageSize;
+
+    VkImage m_sourceImage;
+    VkImageView m_sourceImageView;
+    VkDeviceMemory m_sourceImageMemory;
 };

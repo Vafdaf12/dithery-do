@@ -27,21 +27,16 @@ StagingBuffer::~StagingBuffer() {
 }
 
 void StagingBuffer::copyToBuffer(
-    VkBuffer buffer, VkQueue queue, VkCommandPool commandPool) {
-    VkCommandBuffer cmdBuffer = beginCommandBuffer(commandPool);
+    VkBuffer buffer, VkCommandBuffer cmdBuffer) {
 
     VkBufferCopy copyRegion{};
     copyRegion.size = m_size;
     vkCmdCopyBuffer(cmdBuffer, m_buffer, buffer, 1, &copyRegion);
-
-    submitCommandBuffer(cmdBuffer, commandPool, queue);
 }
 void StagingBuffer::copyToImage(VkImage image,
     uint32_t width,
     uint32_t height,
-    VkQueue queue,
-    VkCommandPool commandPool) {
-    VkCommandBuffer cmdBuffer = beginCommandBuffer(commandPool);
+    VkCommandBuffer cmdBuffer) {
 
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -57,37 +52,6 @@ void StagingBuffer::copyToImage(VkImage image,
     region.imageExtent = {width, height, 1};
 
     vkCmdCopyBufferToImage(cmdBuffer, m_buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    submitCommandBuffer(cmdBuffer, commandPool, queue);
-}
-VkCommandBuffer StagingBuffer::beginCommandBuffer(VkCommandPool pool) {
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = pool;
-    allocInfo.commandBufferCount = 1;
-
-    VkCommandBuffer cmdBuffer;
-    vkAllocateCommandBuffers(m_device, &allocInfo, &cmdBuffer);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(cmdBuffer, &beginInfo);
-    return cmdBuffer;
-}
-void StagingBuffer::submitCommandBuffer(VkCommandBuffer cmdBuffer, VkCommandPool pool, VkQueue queue) {
-    vkEndCommandBuffer(cmdBuffer);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &cmdBuffer;
-
-    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
-
-    vkFreeCommandBuffers(m_device, pool, 1, &cmdBuffer);
 }
 void StagingBuffer::write(const void* pData) {
     memcpy(m_pMapped, pData, m_size);
