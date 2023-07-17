@@ -28,6 +28,10 @@ private:
     void createComputePipeline();
     std::vector<uint8_t> readDestImage();
 
+    void createDescriptorSetLayout();
+    void createDescriptorPool();
+    void createDescriptorSets();
+
     void cleanup();
 
     void transitionImageLayout(VkImage image,
@@ -66,4 +70,8 @@ private:
 
     VkBuffer m_stagingBuffer;
     VkDeviceMemory m_stagingMemory;
+
+    VkDescriptorSetLayout m_descriptorSetLayout;
+    VkDescriptorPool m_descriptorPool;
+    VkDescriptorSet m_descriptorSet;
 };

@@ -1,5 +1,6 @@
 #include "Vulkan.h"
 
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <optional>
@@ -34,11 +35,16 @@ void Vulkan::run() {
     createLogicalDevice();
 
     m_memoryPool = vk::ext::DevicePool(m_physicalDevice, m_device);
-    createComputePipeline();
+
     createCommandPool();
     createSourceImage();
     createDestImage();
     createStagingBuffer();
+
+    createDescriptorSetLayout();
+    createDescriptorPool();
+    createDescriptorSets();
+    createComputePipeline();
 
     cleanup();
 }
@@ -63,6 +69,8 @@ void Vulkan::createComputePipeline() {
 
     VkPipelineLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfo.pSetLayouts = &m_descriptorSetLayout;
+    layoutInfo.setLayoutCount = 1;
 
     VkResult result = vkCreatePipelineLayout(
         m_device, &layoutInfo, nullptr, &m_pipelineLayout);
@@ -164,6 +172,16 @@ void Vulkan::transitionImageLayout(VkImage image,
         srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
+    // Transfer from uninitialized layout to layout
+    // optimized for general use (destination image)
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+        newLayout == VK_IMAGE_LAYOUT_GENERAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+        srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    }
     // Image has loaded and is ready to be accessed
     // by compute shader
     else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
@@ -173,9 +191,9 @@ void Vulkan::transitionImageLayout(VkImage image,
 
         srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         dstStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+    } else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL &&
                newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
-        barrier.srcAccessMask = 0;
+        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
         srcStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
@@ -206,6 +224,14 @@ void Vulkan::createDestImage() {
     res = m_memoryPool.createImageView(
         m_destImage, VK_FORMAT_R8G8B8A8_UNORM, m_destImageView);
     EXPECT_VK(res, "Failed to create image view")
+
+    auto buffer = beginTransferBuffer();
+    transitionImageLayout(m_destImage,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL,
+        buffer);
+    submitTransferBuffer(buffer);
 }
 void Vulkan::createStagingBuffer() {
     VkDeviceSize bufSize = WIDTH * HEIGHT * 4;
@@ -220,7 +246,6 @@ void Vulkan::createStagingBuffer() {
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
         m_stagingMemory);
     EXPECT_VK(res, "Failed to create staging buffer memory")
-
 }
 std::vector<uint8_t> Vulkan::readDestImage() {
     VkDeviceSize bufSize = WIDTH * HEIGHT * 4;
@@ -262,6 +287,73 @@ std::vector<uint8_t> Vulkan::readDestImage() {
 
     vkUnmapMemory(m_device, m_stagingMemory);
     return bytes;
+}
+void Vulkan::createDescriptorSetLayout() {
+    VkDescriptorSetLayoutBinding inputBinding{};
+    inputBinding.binding = 0;
+    inputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    inputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    inputBinding.descriptorCount = 1;
+
+    VkDescriptorSetLayoutBinding outputBinding{};
+    outputBinding.binding = 1;
+    outputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    outputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    outputBinding.descriptorCount = 1;
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
+        inputBinding, outputBinding};
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.pBindings = bindings.data();
+    layoutInfo.bindingCount = bindings.size();
+
+    VkResult result = vkCreateDescriptorSetLayout(
+        m_device, &layoutInfo, nullptr, &m_descriptorSetLayout);
+    EXPECT_VK(result, "Failed to create descriptor set layout")
+}
+void Vulkan::createDescriptorPool() {
+    VkDescriptorPoolSize poolSize;
+    poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    poolSize.descriptorCount = 2;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.maxSets = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.poolSizeCount = 1;
+
+    VkResult result =
+        vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_descriptorPool);
+    EXPECT_VK(result, "Failed to create descriptor pool")
+}
+void Vulkan::createDescriptorSets() {
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.pSetLayouts = &m_descriptorSetLayout;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.descriptorPool = m_descriptorPool;
+
+    VkResult result =
+        vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet);
+    EXPECT_VK(result, "Failed to create descriptor pool");
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.sampler = VK_NULL_HANDLE;
+    imageInfo.imageView = m_destImageView;
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet writeInfo{};
+    writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeInfo.dstSet = m_descriptorSet;
+    writeInfo.dstArrayElement = 0;
+    writeInfo.dstBinding = 1;
+    writeInfo.descriptorCount = 1;
+    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writeInfo.pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
 }
 void Vulkan::createSourceImage() {
     int n;
@@ -366,9 +458,11 @@ void Vulkan::createLogicalDevice() {
 }
 
 void Vulkan::cleanup() {
+    vk::destroy(m_device, m_descriptorSetLayout);
+    vk::destroy(m_device, m_descriptorPool);
+
     vk::destroy(m_device, m_pipeline);
     vk::destroy(m_device, m_pipelineLayout);
-    vk::destroy(m_device, m_descriptorSetLayout);
 
     m_memoryPool.destroy();
     vk::destroy(m_device, m_computeCommandPool);
