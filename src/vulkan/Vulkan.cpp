@@ -45,6 +45,10 @@ void Vulkan::run() {
     createDescriptorPool();
     createDescriptorSets();
     createComputePipeline();
+    processImage();
+
+    auto bytes = readDestImage();
+    stbi_write_jpg("output.jpg", WIDTH, HEIGHT, 4, bytes.data(), 100);
 
     cleanup();
 }
@@ -175,7 +179,7 @@ void Vulkan::transitionImageLayout(VkImage image,
     // Transfer from uninitialized layout to layout
     // optimized for general use (destination image)
     else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-        newLayout == VK_IMAGE_LAYOUT_GENERAL) {
+             newLayout == VK_IMAGE_LAYOUT_GENERAL) {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
@@ -185,7 +189,7 @@ void Vulkan::transitionImageLayout(VkImage image,
     // Image has loaded and is ready to be accessed
     // by compute shader
     else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-             newLayout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL) {
+             newLayout == VK_IMAGE_LAYOUT_GENERAL) {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
@@ -253,7 +257,7 @@ std::vector<uint8_t> Vulkan::readDestImage() {
     VkCommandBuffer buffer = beginTransferBuffer();
     transitionImageLayout(m_destImage,
         VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL,
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         buffer);
 
@@ -328,6 +332,18 @@ void Vulkan::createDescriptorPool() {
         vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_descriptorPool);
     EXPECT_VK(result, "Failed to create descriptor pool")
 }
+
+VkWriteDescriptorSet imageInfo(VkDescriptorSet descriptorSet, uint32_t binding, const VkDescriptorImageInfo& imageInfo) {
+    VkWriteDescriptorSet writeInfo{};
+    writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeInfo.dstSet = descriptorSet;
+    writeInfo.dstArrayElement = 0;
+    writeInfo.dstBinding = binding;
+    writeInfo.descriptorCount = 1;
+    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writeInfo.pImageInfo = &imageInfo;
+    return writeInfo;
+}
 void Vulkan::createDescriptorSets() {
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -339,21 +355,61 @@ void Vulkan::createDescriptorSets() {
         vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet);
     EXPECT_VK(result, "Failed to create descriptor pool");
 
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.sampler = VK_NULL_HANDLE;
-    imageInfo.imageView = m_destImageView;
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkDescriptorImageInfo imageInfoDest{};
+    imageInfoDest.sampler = VK_NULL_HANDLE;
+    imageInfoDest.imageView = m_destImageView;
+    imageInfoDest.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet writeInfo{};
-    writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writeInfo.dstSet = m_descriptorSet;
-    writeInfo.dstArrayElement = 0;
-    writeInfo.dstBinding = 1;
-    writeInfo.descriptorCount = 1;
-    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    writeInfo.pImageInfo = &imageInfo;
+    VkDescriptorImageInfo imageInfoSource{};
+    imageInfoSource.sampler = VK_NULL_HANDLE;
+    imageInfoSource.imageView = m_sourceImageView;
+    imageInfoSource.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    vkUpdateDescriptorSets(m_device, 1, &writeInfo, 0, nullptr);
+    VkWriteDescriptorSet writeInfoDest = imageInfo(m_descriptorSet, 1, imageInfoDest);
+    VkWriteDescriptorSet writeInfoSource = imageInfo(m_descriptorSet, 0, imageInfoSource);
+
+    VkWriteDescriptorSet writes[] = {
+        writeInfoSource, writeInfoDest
+    };
+
+    vkUpdateDescriptorSets(m_device, 2, writes, 0, nullptr);
+}
+void Vulkan::processImage() {
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = m_computeCommandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer buffer;
+    vkAllocateCommandBuffers(m_device, &allocInfo, &buffer);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(buffer, &beginInfo);
+
+    vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
+    vkCmdBindDescriptorSets(buffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        m_pipelineLayout,
+        0,
+        1,
+        &m_descriptorSet,
+        0,
+        nullptr);
+    vkCmdDispatch(buffer, WIDTH, HEIGHT, 1);
+
+    vkEndCommandBuffer(buffer);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &buffer;
+
+    vkQueueSubmit(m_computeQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(m_computeQueue);
+
 }
 void Vulkan::createSourceImage() {
     int n;
@@ -394,7 +450,7 @@ void Vulkan::createSourceImage() {
     transitionImageLayout(m_sourceImage,
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+        VK_IMAGE_LAYOUT_GENERAL,
         cmdBuffer);
 
     submitTransferBuffer(cmdBuffer);

@@ -32,6 +32,8 @@ private:
     void createDescriptorPool();
     void createDescriptorSets();
 
+    void processImage();
+
     void cleanup();
 
     void transitionImageLayout(VkImage image,
