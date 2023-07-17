@@ -1,6 +1,5 @@
 #include "./vulkan_wrapper.h"
 
-
 #include <cstdint>
 #include <fstream>
 #include <ios>
@@ -157,6 +156,13 @@ std::vector<VkCommandBuffer> allocateCommandBuffers(
 
     return buffers;
 }
+
+DESTROY(VkPipeline, vkDestroyPipeline)
+DESTROY(VkPipelineLayout, vkDestroyPipelineLayout)
+DESTROY(VkCommandPool, vkDestroyCommandPool)
+DESTROY(VkDescriptorSetLayout, vkDestroyDescriptorSetLayout)
+DESTROY(VkDescriptorPool, vkDestroyDescriptorPool)
+
 } // namespace vk
 namespace util {
 std::vector<char> readFile(const std::string& filename) {

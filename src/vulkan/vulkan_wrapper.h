@@ -11,6 +11,12 @@
 #define EXPECT_VK(result, msg)                                                      \
     if ((result) != VK_SUCCESS) throw std::runtime_error(msg);
 
+#define DESTROY(type, func)                                                    \
+    template <>                                                                \
+    void destroy<type>(VkDevice device, type obj) {                            \
+        func(device, obj, nullptr);                                            \
+    }
+
 namespace vk {
 std::vector<VkLayerProperties> getInstanceLayers();
 std::vector<VkExtensionProperties> getInstanceExtensions();
@@ -44,6 +50,9 @@ std::vector<VkCommandBuffer> allocateCommandBuffers(VkDevice device,
     VkCommandPool pool,
     uint32_t count,
     bool secondary = false);
+
+template<class T>
+void destroy(VkDevice device, T object);
 } // namespace vk
 
 namespace util {

@@ -366,11 +366,12 @@ void Vulkan::createLogicalDevice() {
 }
 
 void Vulkan::cleanup() {
-    vkDestroyPipeline(m_device, m_pipeline, nullptr);
-    vkDestroyPipelineLayout(m_device, m_pipelineLayout, nullptr);
+    vk::destroy(m_device, m_pipeline);
+    vk::destroy(m_device, m_pipelineLayout);
+    vk::destroy(m_device, m_descriptorSetLayout);
 
     m_memoryPool.destroy();
-    vkDestroyCommandPool(m_device, m_computeCommandPool, nullptr);
-    vkDestroyCommandPool(m_device, m_transferCommandPool, nullptr);
+    vk::destroy(m_device, m_computeCommandPool);
+    vk::destroy(m_device, m_transferCommandPool);
     vkDestroyDevice(m_device, nullptr);
 }
