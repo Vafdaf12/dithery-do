@@ -11,8 +11,8 @@ public:
     void run();
 
 private:
-    static constexpr uint32_t WIDTH = 200;
-    static constexpr uint32_t HEIGHT = 100;
+    static int WIDTH;
+    static int HEIGHT;
 
     bool isDeviceSuitable(VkPhysicalDevice device) const;
 
@@ -22,8 +22,11 @@ private:
     void createLogicalDevice();
 
     void createSourceImage();
+    void createDestImage();
+    void createStagingBuffer();
     void createCommandPool();
     void createComputePipeline();
+    std::vector<uint8_t> readDestImage();
 
     void cleanup();
 
@@ -56,4 +59,11 @@ private:
     VkImage m_sourceImage;
     VkImageView m_sourceImageView;
     VkDeviceMemory m_sourceImageMemory;
+
+    VkImage m_destImage;
+    VkImageView m_destImageView;
+    VkDeviceMemory m_destImageMemory;
+
+    VkBuffer m_stagingBuffer;
+    VkDeviceMemory m_stagingMemory;
 };
