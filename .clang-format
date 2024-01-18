@@ -1,0 +1,16 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+---
+Language: Cpp
+DerivePointerAlignment: false
+PointerAlignment: Left
+AccessModifierOffset: -4
+AlwaysBreakTemplateDeclarations: Yes
+ColumnLimit: 100
+
+AllowShortCaseLabelsOnASingleLine: true
+
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: BlockIndent
