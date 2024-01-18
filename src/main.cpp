@@ -1,23 +1,20 @@
 #include "color/LabColorSpace.h"
 #include "color/XyzColorSpace.h"
 
-#include "CLI/App.hpp"
-#include "CLI/Formatter.hpp"
-#include "CLI/Config.hpp"
-#include "CLI/Validators.hpp"
-
-#include "glm/geometric.hpp"
-
-#include "select/ClosestPartition.h"
-#include "select/ClosestLine.h"
 #include "select/BrightnessPartition.h"
-#include "select/IColorSelector.h"
 #include "select/ClosestEuclidian.h"
+#include "select/ClosestLine.h"
+#include "select/ClosestPartition.h"
+#include "select/IColorSelector.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
-#include <string>
+#include "argparse/argparse.hpp"
+
+#include <exception>
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 #include "Image.h"
 #include "Palette.h"
@@ -25,111 +22,133 @@
 void diffuse_steinberg(Image& img, const glm::vec3& err, int x, int y) {
     glm::vec3 pix, i;
 
-    i = img.get(x+1, y);
+    i = img.get(x + 1, y);
     pix = i + err * (7 / 16.f);
-    img.set(x+1, y, pix);
+    img.set(x + 1, y, pix);
 
-    i = img.get(x-1, y+1);
+    i = img.get(x - 1, y + 1);
     pix = i + err * (3 / 16.f);
-    img.set(x-1, y+1, pix);
+    img.set(x - 1, y + 1, pix);
 
-    i = img.get(x, y+1);
+    i = img.get(x, y + 1);
     pix = i + err * (5 / 16.f);
-    img.set(x, y+1, pix);
+    img.set(x, y + 1, pix);
 
-    i = img.get(x+1, y+1);
+    i = img.get(x + 1, y + 1);
     pix = i + err * (1 / 16.f);
-    img.set(x+1, y+1, pix);
+    img.set(x + 1, y + 1, pix);
 }
 
-enum ColorSpace {
-    CS_RGB = 0,
-    CS_XYZ,
-    CS_LAB
-};
+enum class ColorSpace { Rgb = 0, Xyz, Lab };
 
-enum SelectionAlgo {
-    SA_CLOSEST_EUCLID = 0,
-    SA_CLOSEST_LINE,
-    SA_CLOSEST_PARTITION,
-    SA_CLOSEST_TRI,
+enum class Algorithm {
+    ClosestEuclid = 0,
+    ClosestLine,
+    ClosestPartition,
+    ClosestTri,
 };
+ColorSpace space_from_string(const std::string& val) {
+    if (val == "rgb") {
+        return ColorSpace::Rgb;
+    } else if (val == "xyz") {
+        return ColorSpace::Xyz;
+    } else if (val == "lab") {
+        return ColorSpace::Lab;
+    } else {
+        throw std::invalid_argument("Unsupported color space: " + val);
+    }
+}
+Algorithm algo_from_string(const std::string& val) {
+    if (val == "euclid") {
+        return Algorithm::ClosestEuclid;
+    } else if (val == "line") {
+        return Algorithm::ClosestLine;
+    } else if (val == "partition") {
+        return Algorithm::ClosestPartition;
+    } else if (val == "tri") {
+        return Algorithm::ClosestTri;
+    } else {
+        throw std::invalid_argument("Unsupported algorithm: " + val);
+    }
+}
 
 
 int main(int argc, char** argv) {
-    CLI::App app{"This is a CLI utility"};
+    argparse::ArgumentParser cli("Dithery Do");
 
-    std::string inFile = "";
-    std::string outFile = "output.jpg";
-    std::string paletteFile = "palette.txt";
-    ColorSpace colorSpace = CS_RGB;
-    SelectionAlgo selectionAlgorithm = SA_CLOSEST_EUCLID;
+    cli.add_argument("input").help("The input image");
+    cli.add_argument("palette").help("Path to palette file");
 
-    app.add_option("-f, --file", inFile, "The input image")
-        ->required(true)
-        ->check(CLI::ExistingFile);
+    cli.add_argument("-o").help("Path of output image").default_value("output.jpg");
 
-    app.add_option("-p, --palette", paletteFile, "Path to palette file")
-        ->required(true)
-        ->check(CLI::ExistingFile);
+    cli.add_argument("-a", "-algo")
+        .help("The color selection algorithm to use")
+        .choices("euclid", "line", "partition", "tri")
+        .required();
 
-    app.add_option("--color-space", colorSpace, "The color space to use for selection");
-    app.add_option("--select", selectionAlgorithm, "The color selection algorithm to use");
+    cli.add_argument("-s", "-space")
+        .help("The color space to use for selection")
+        .choices("rgb", "xyz", "lab")
+        .default_value("rgb")
+        .required();
 
-    app.add_option("-o, --output", outFile, "The output image");
+    // Parse the output
+    std::string inputPath;
+    std::string outputPath;
+    std::string palettePath;
 
+    Algorithm algorithm;
+    ColorSpace space;
 
-    CLI11_PARSE(app, argc, argv);
+    try {
+        cli.parse_args(argc, argv);
 
-    int w, h, n;
+        algorithm = algo_from_string(cli.get("-algo"));
+        space = space_from_string(cli.get("-space"));
+        inputPath = cli.get("input");
+        outputPath = cli.get("-o");
+        palettePath = cli.get("palette");
 
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        std::cerr << cli;
+        return 1;
+    }
 
-    std::cout << "Read File: " << inFile << std::endl;
-    std::cout << "Write File: " << outFile << std::endl;
-    std::cout << "Palette: " << paletteFile << std::endl;
+    std::cout << "Read File: " << inputPath << std::endl;
+    std::cout << "Write File: " << outputPath << std::endl;
+    std::cout << "Palette: " << palettePath << std::endl;
 
     Image image;
     Palette palette;
 
-    image.loadFromFile(inFile);
-    palette.loadFromFile(paletteFile);
+    image.loadFromFile(inputPath);
+    palette.loadFromFile(palettePath);
 
-    IColorSpace* space;
-    switch(colorSpace) {
-        case CS_RGB:
-            space = nullptr;
-            break;
-        case CS_XYZ:
-            space = new XyzColorSpace;
-            break;
-        case CS_LAB:
-            space = new LabColorSpace(LabColorSpace::D50);
-            break;
+    IColorSpace* spaceMapping;
+    switch (space) {
+    case ColorSpace::Rgb: spaceMapping = nullptr; break;
+    case ColorSpace::Xyz: spaceMapping = new XyzColorSpace; break;
+    case ColorSpace::Lab: spaceMapping = new LabColorSpace(LabColorSpace::D50); break;
     }
 
-    IColorSelector* selector = new ClosestEuclidian(palette, space);
-    switch(selectionAlgorithm) {
-        case SA_CLOSEST_EUCLID:
-            selector = new ClosestEuclidian(palette, space);
-            break;
-        case SA_CLOSEST_LINE:
-            selector = new ClosestLine(palette, space);
-            break;
-        case SA_CLOSEST_PARTITION:
-            selector = new ClosestPartition(palette, space);
-            break;
-        case SA_CLOSEST_TRI:
-            selector = new BrightnessPartition(palette);
-            break;
+    IColorSelector* selector = new ClosestEuclidian(palette, spaceMapping);
+    switch (algorithm) {
+
+    case Algorithm::ClosestEuclid: selector = new ClosestEuclidian(palette, spaceMapping); break;
+    case Algorithm::ClosestLine: selector = new ClosestLine(palette, spaceMapping); break;
+    case Algorithm::ClosestPartition: selector = new ClosestPartition(palette, spaceMapping); break;
+    case Algorithm::ClosestTri: selector = new BrightnessPartition(palette); break;
     }
 
-    for(int y = 0; y < image.height(); y++) {
-        for(int x = 1; x < image.width(); x++) {
+    for (int y = 0; y < image.height(); y++) {
+        for (int x = 1; x < image.width(); x++) {
             glm::vec3 src = image.get(x, y);
             glm::vec3 dest = selector->select(src);
             image.set(x, y, dest);
         }
     }
 
-    image.writeToFile(outFile);
+    image.writeToFile(outputPath);
+
 }
