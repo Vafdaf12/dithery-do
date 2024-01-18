@@ -13,14 +13,14 @@ set(CMAKE_BUILD_TYPE Debug)
 set(NAME_EXE ${PROJECT_NAME})
 
 
-# ------------ FETCH GLM ------------ 
-FetchContent_Declare(glm 
+# ------------ FETCH GLM ------------
+FetchContent_Declare(glm
     GIT_REPOSITORY https://github.com/g-truc/glm
     GIT_TAG 0.9.9.8
 )
 FetchContent_MakeAvailable(glm)
 
-# ------------ FETCH CLI11 ------------ 
+# ------------ FETCH CLI11 ------------
 FetchContent_Declare(
     argparse
     GIT_REPOSITORY https://github.com/p-ranav/argparse.git
@@ -30,10 +30,11 @@ FetchContent_MakeAvailable(argparse)
 
 # ------------ CONFIGURE APPLICATION -------------------
 
-add_executable(${NAME_EXE} 
+add_executable(${NAME_EXE}
+    external/stb/stb_image.cpp
+    external/stb/stb_image_write.cpp
+
     src/main.cpp
-    src/stb/stb_image.cpp
-    src/stb/stb_image_write.cpp
     src/color/LabColorSpace.cpp
     src/color/XyzColorSpace.cpp
     src/select/BrightnessPartition.cpp
@@ -41,7 +42,12 @@ add_executable(${NAME_EXE}
     src/select/ClosestLine.cpp
     src/select/ClosestPartition.cpp
     src/Palette.cpp
-    )
+)
+target_include_directories(${NAME_EXE}
+    PRIVATE external
+    PRIVATE src
+)
+
 target_link_libraries(${NAME_EXE} argparse glm)
 
 
