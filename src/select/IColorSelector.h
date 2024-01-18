@@ -4,5 +4,6 @@
 
 class IColorSelector {
 public:
+    virtual ~IColorSelector() {}
     virtual glm::vec3 select(glm::vec3& target) = 0;
 };

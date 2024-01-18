@@ -29,14 +29,19 @@ FetchContent_MakeAvailable(argparse)
 
 
 # ------------ CONFIGURE APPLICATION -------------------
-file(GLOB SRCFILES
-    src/*.cpp
-    src/stb/*.cpp
-    src/select/*.cpp
-    src/color/*.cpp
-)
 
-add_executable(${NAME_EXE} ${SRCFILES})
+add_executable(${NAME_EXE} 
+    src/main.cpp
+    src/stb/stb_image.cpp
+    src/stb/stb_image_write.cpp
+    src/color/LabColorSpace.cpp
+    src/color/XyzColorSpace.cpp
+    src/select/BrightnessPartition.cpp
+    src/select/ClosestEuclidian.cpp
+    src/select/ClosestLine.cpp
+    src/select/ClosestPartition.cpp
+    src/Palette.cpp
+    )
 target_link_libraries(${NAME_EXE} argparse glm)
 
 

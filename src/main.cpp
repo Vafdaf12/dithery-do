@@ -1,47 +1,28 @@
+#include "Palette.h"
+#include "color/IColorSpace.h"
 #include "color/LabColorSpace.h"
 #include "color/XyzColorSpace.h"
-
 #include "select/BrightnessPartition.h"
 #include "select/ClosestEuclidian.h"
 #include "select/ClosestLine.h"
 #include "select/ClosestPartition.h"
 #include "select/IColorSelector.h"
+
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
-
 #include "argparse/argparse.hpp"
 
 #include <exception>
+#include <filesystem>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
-#include "Image.h"
-#include "Palette.h"
+enum class ColorSpace : int { Rgb = 0, Xyz, Lab };
 
-void diffuse_steinberg(Image& img, const glm::vec3& err, int x, int y) {
-    glm::vec3 pix, i;
-
-    i = img.get(x + 1, y);
-    pix = i + err * (7 / 16.f);
-    img.set(x + 1, y, pix);
-
-    i = img.get(x - 1, y + 1);
-    pix = i + err * (3 / 16.f);
-    img.set(x - 1, y + 1, pix);
-
-    i = img.get(x, y + 1);
-    pix = i + err * (5 / 16.f);
-    img.set(x, y + 1, pix);
-
-    i = img.get(x + 1, y + 1);
-    pix = i + err * (1 / 16.f);
-    img.set(x + 1, y + 1, pix);
-}
-
-enum class ColorSpace { Rgb = 0, Xyz, Lab };
-
-enum class Algorithm {
+enum class Algorithm : int {
     ClosestEuclid = 0,
     ClosestLine,
     ClosestPartition,
@@ -71,7 +52,22 @@ Algorithm algo_from_string(const std::string& val) {
         throw std::invalid_argument("Unsupported algorithm: " + val);
     }
 }
+const std::string& validate_path(const std::string& path) {
+    if (!std::filesystem::exists(path)) {
+        throw std::invalid_argument("Path not found: " + path);
+    }
+    return path;
+}
+uint32_t color_key(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) {
+    return (r << 16) + (g << 8) + b;
+}
+glm::vec3 color_vec(uint32_t key) {
+    uint8_t r = (key >> 16) & 255;
+    uint8_t g = (key >> 8) & 255;
+    uint8_t b = key & 255;
 
+    return glm::vec3(r, g, b) / 255.0f;
+}
 
 int main(int argc, char** argv) {
     argparse::ArgumentParser cli("Dithery Do");
@@ -105,9 +101,9 @@ int main(int argc, char** argv) {
 
         algorithm = algo_from_string(cli.get("-algo"));
         space = space_from_string(cli.get("-space"));
-        inputPath = cli.get("input");
+        inputPath = validate_path(cli.get("input"));
+        palettePath = validate_path(cli.get("palette"));
         outputPath = cli.get("-o");
-        palettePath = cli.get("palette");
 
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -118,37 +114,75 @@ int main(int argc, char** argv) {
     std::cout << "Read File: " << inputPath << std::endl;
     std::cout << "Write File: " << outputPath << std::endl;
     std::cout << "Palette: " << palettePath << std::endl;
+    std::cout << "Algorithm: " << int(algorithm) << std::endl;
+    std::cout << "Color Space: " << int(space) << std::endl;
 
-    Image image;
+    // Load input data
+    int width, height, channels;
+    uint8_t* data = stbi_load(inputPath.c_str(), &width, &height, &channels, 3);
+    channels = 3;
+    if (!data) {
+        std::cerr << "Failed to load image: " << stbi_failure_reason() << std::endl;
+        return 1;
+    }
     Palette palette;
+    if (!palette.loadFromFile(palettePath)) {
+        std::cerr << "Failed to load palette" << std::endl;
+        return 1;
+    }
 
-    image.loadFromFile(inputPath);
-    palette.loadFromFile(palettePath);
+    // Get all distinct colors
+    std::cout << "Pixels:\t" << width * height << std::endl;
+    std::unordered_map<uint32_t, glm::vec3> colors;
+    for (size_t i = 0; i < width * height; i++) {
+        uint8_t* color = data + (i * channels);
+        uint32_t key = color_key(color[0], color[1], color[2]);
+        colors.insert({key, color_vec(key)});
+    }
+    std::cout << "Colors:\t" << colors.size() << std::endl;
 
-    IColorSpace* spaceMapping;
+    // Map to desired color space
+    std::unique_ptr<IColorSpace> colorSpace;
     switch (space) {
-    case ColorSpace::Rgb: spaceMapping = nullptr; break;
-    case ColorSpace::Xyz: spaceMapping = new XyzColorSpace; break;
-    case ColorSpace::Lab: spaceMapping = new LabColorSpace(LabColorSpace::D50); break;
+    case ColorSpace::Rgb: colorSpace = nullptr; break;
+    case ColorSpace::Xyz: colorSpace = std::make_unique<XyzColorSpace>(); break;
+    case ColorSpace::Lab: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D50); break;
     }
 
-    IColorSelector* selector = new ClosestEuclidian(palette, spaceMapping);
+    std::unique_ptr<IColorSelector> colorSelector;
     switch (algorithm) {
-
-    case Algorithm::ClosestEuclid: selector = new ClosestEuclidian(palette, spaceMapping); break;
-    case Algorithm::ClosestLine: selector = new ClosestLine(palette, spaceMapping); break;
-    case Algorithm::ClosestPartition: selector = new ClosestPartition(palette, spaceMapping); break;
-    case Algorithm::ClosestTri: selector = new BrightnessPartition(palette); break;
+    case Algorithm::ClosestEuclid:
+        colorSelector = std::make_unique<ClosestEuclidian>(palette, colorSpace.get());
+        break;
+    case Algorithm::ClosestLine:
+        colorSelector = std::make_unique<ClosestLine>(palette, colorSpace.get());
+        break;
+    case Algorithm::ClosestPartition:
+        colorSelector = std::make_unique<ClosestPartition>(palette, colorSpace.get());
+        break;
+    case Algorithm::ClosestTri:
+        colorSelector = std::make_unique<BrightnessPartition>(palette);
+        break;
     }
 
-    for (int y = 0; y < image.height(); y++) {
-        for (int x = 1; x < image.width(); x++) {
-            glm::vec3 src = image.get(x, y);
-            glm::vec3 dest = selector->select(src);
-            image.set(x, y, dest);
-        }
+    for (auto& [key, value] : colors) {
+        colors[key] = colorSelector->select(value);
     }
 
-    image.writeToFile(outputPath);
+    // Apply mapping to image
+    for (size_t i = 0; i < width * height; i++) {
+        uint8_t* color = data + (i * channels);
+        uint32_t key = color_key(color[0], color[1], color[2]);
+        glm::vec3 mapped = colors[key];
+        color[0] = mapped.r * 255;
+        color[1] = mapped.g * 255;
+        color[2] = mapped.b * 255;
+    }
 
+    // Write image to file
+    int result = stbi_write_jpg(outputPath.c_str(), width, height, channels, data, 100);
+    if (result == 0) {
+        std::cerr << "Failed to write image: " << stbi_failure_reason() << std::endl;
+        return 1;
+    }
 }
