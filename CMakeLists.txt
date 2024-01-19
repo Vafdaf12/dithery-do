@@ -41,6 +41,7 @@ add_executable(${NAME_EXE}
     src/select/ClosestEuclidian.cpp
     src/select/ClosestLine.cpp
     src/select/ClosestPartition.cpp
+    src/select/PartitionBlend.cpp
     src/Palette.cpp
 )
 target_include_directories(${NAME_EXE}

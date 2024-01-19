@@ -8,6 +8,7 @@
 #include "select/ClosestPartition.h"
 #include "select/IColorSelector.h"
 
+#include "select/PartitionBlend.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 #include "argparse/argparse.hpp"
@@ -27,6 +28,7 @@ enum class Algorithm : int {
     ClosestLine,
     ClosestPartition,
     ClosestTri,
+    Blend,
 };
 ColorSpace space_from_string(const std::string& val) {
     if (val == "rgb") {
@@ -48,6 +50,8 @@ Algorithm algo_from_string(const std::string& val) {
         return Algorithm::ClosestPartition;
     } else if (val == "tri") {
         return Algorithm::ClosestTri;
+    } else if (val == "blend") {
+        return Algorithm::Blend;
     } else {
         throw std::invalid_argument("Unsupported algorithm: " + val);
     }
@@ -69,6 +73,9 @@ glm::vec3 color_vec(uint32_t key) {
     return glm::vec3(r, g, b) / 255.0f;
 }
 
+bool brightness(glm::vec3 target, glm::vec3 value) {
+    return value.r < target.r;
+}
 int main(int argc, char** argv) {
     argparse::ArgumentParser cli("Dithery Do");
 
@@ -79,7 +86,7 @@ int main(int argc, char** argv) {
 
     cli.add_argument("-a", "-algo")
         .help("The color selection algorithm to use")
-        .choices("euclid", "line", "partition", "tri")
+        .choices("euclid", "line", "partition", "tri", "blend")
         .required();
 
     cli.add_argument("-s", "-space")
@@ -131,6 +138,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+
     // Get all distinct colors
     std::cout << "Pixels:\t" << width * height << std::endl;
     std::unordered_map<uint32_t, glm::vec3> colors;
@@ -146,7 +154,7 @@ int main(int argc, char** argv) {
     switch (space) {
     case ColorSpace::Rgb: colorSpace = nullptr; break;
     case ColorSpace::Xyz: colorSpace = std::make_unique<XyzColorSpace>(); break;
-    case ColorSpace::Lab: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D50); break;
+    case ColorSpace::Lab: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D65); break;
     }
 
     std::unique_ptr<IColorSelector> colorSelector;
@@ -162,6 +170,9 @@ int main(int argc, char** argv) {
         break;
     case Algorithm::ClosestTri:
         colorSelector = std::make_unique<BrightnessPartition>(palette);
+        break;
+    case Algorithm::Blend:
+        colorSelector = std::make_unique<PartitionBlend>(palette, brightness, colorSpace.get());
         break;
     }
 
