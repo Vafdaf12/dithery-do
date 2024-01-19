@@ -9,6 +9,7 @@
 #include "select/ClosestLine.h"
 
 #include "argparse/argparse.hpp"
+#include "select/PartitionBlend.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
@@ -25,7 +26,7 @@ enum class ColorSpace : int { Rgb = 0, Xyz, Lab50, Lab65 };
 enum class Algorithm : int {
     ClosestEuclid = 0,
     ClosestLine,
-    Blend,
+    ChannelPartition,
 };
 ColorSpace space_from_string(const std::string& val) {
     if (val == "rgb") {
@@ -46,7 +47,7 @@ Algorithm algo_from_string(const std::string& val) {
     } else if (val == "line") {
         return Algorithm::ClosestLine;
     } else if (val == "blend_chan") {
-        return Algorithm::Blend;
+        return Algorithm::ChannelPartition;
     } else {
         throw std::invalid_argument("Unsupported algorithm: " + val);
     }
@@ -228,18 +229,12 @@ int main(int argc, char** argv) {
         pipeline->append(std::make_unique<ClosestLine>(mapped));
         break;
     }
-        /*
-case Algorithm::Blend: {
-using namespace std::placeholders;
-colorSelector = std::make_unique<PartitionBlend>(
-palette, std::bind(brightness, channel, _1, _2), colorSpace.get()
-);
-break;
-}
-*/
-    default: {
-        std::cerr << "Unsupported algorithm" << std::endl;
-        return 1;
+    case Algorithm::ChannelPartition: {
+        using namespace std::placeholders;
+        pipeline->append(
+            std::make_unique<PartitionBlend>(mapped, std::bind(brightness, channel, _1, _2))
+        );
+        break;
     }
     }
 

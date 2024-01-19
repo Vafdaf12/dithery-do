@@ -5,68 +5,48 @@
 #include <algorithm>
 #include <numeric>
 
-PartitionBlend::PartitionBlend(const Palette& palette, Func fn, IColorSpace* colorSpace)
-    : m_palette(palette), m_mappedColors(palette.colors()), m_pColorSpace(colorSpace), m_func(fn)
 
-{
-    if (m_pColorSpace) {
-        std::transform(
-            m_mappedColors.begin(),
-            m_mappedColors.end(),
-            m_mappedColors.begin(),
-            [=](const glm::vec3& c) { return m_pColorSpace->fromRGB(c); }
-        );
-    }
-}
-
-glm::vec3 PartitionBlend::mapRGB(glm::vec3 col) const {
-    if (!m_pColorSpace)
-        return col;
-    return m_pColorSpace->fromRGB(col);
-}
-
-glm::vec3 PartitionBlend::select(glm::vec3& target) {
-    std::vector<int> index(m_palette.colors().size());
+glm::vec3 PartitionBlend::process(glm::vec3 dest) {
+    std::vector<int> index(m_points.size());
     std::iota(index.begin(), index.end(), 0);
 
-    glm::vec3 dest = mapRGB(target);
 
     auto boundary = std::partition(index.begin(), index.end(), [dest, this](int i) {
-        return m_func(dest, m_mappedColors[i]);
+        return m_partition(dest, m_points[i]);
     });
 
     auto left = std::min_element(index.begin(), boundary, [dest, this](int i, int j) {
-        glm::vec3 v = m_mappedColors[i];
-        glm::vec3 max = m_mappedColors[j];
+        glm::vec3 v = m_points[i];
+        glm::vec3 max = m_points[j];
         return glm::distance(dest, v) < glm::distance(dest, max);
     });
 
     auto right = std::min_element(boundary, index.end(), [dest, this](int i, int j) {
-        glm::vec3 v = m_mappedColors[i];
-        glm::vec3 max = m_mappedColors[j];
+        glm::vec3 v = m_points[i];
+        glm::vec3 max = m_points[j];
         return glm::distance(dest, v) < glm::distance(dest, max);
     });
 
     // Bad colour
     if (left == boundary) {
-        return m_palette.colors()[*right];
+        return m_points[*right];
     }
     if (right == index.end()) {
-        return m_palette.colors()[*left];
+        return m_points[*left];
     }
     if(left == right) {
-        return m_palette.colors()[*left];
+        return m_points[*left];
     }
     int i = *left, j = *right;
 
     // blend between colors
-    glm::vec3 darker = m_mappedColors[i];
-    glm::vec3 lighter = m_mappedColors[j];
+    glm::vec3 darker = m_points[i];
+    glm::vec3 lighter = m_points[j];
 
     glm::vec3 dir = glm::normalize(lighter - darker);
     float t = glm::dot(dest - darker, dir) / glm::distance(lighter, darker);
     t = glm::clamp(t, 0.f, 1.f);
 
 
-    return glm::mix(m_palette.colors()[i], m_palette.colors()[j], t);
+    return glm::mix(m_points[i], m_points[j], t);
 }
