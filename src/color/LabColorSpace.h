@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IColorSpace.h"
+#include "color/XyzColorSpace.h"
 #include "glm/ext/vector_float3.hpp"
 
 class LabColorSpace : public IColorSpace {
@@ -14,9 +15,11 @@ public:
 
 private:
     static float func(float t);
-    static glm::vec3 toXYZ(glm::vec3 col);
+    static float funcInv(float t);
 
-    static constexpr float DELTA = 6/29.f;
+    XyzColorSpace m_xyz;
+
+    static constexpr double DELTA = 6/29.f;
 
     glm::vec3 m_illuminant;
 };
