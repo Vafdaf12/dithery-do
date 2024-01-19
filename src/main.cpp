@@ -2,6 +2,7 @@
 #include "color/IColorSpace.h"
 #include "color/LabColorSpace.h"
 #include "color/XyzColorSpace.h"
+#include "glm/common.hpp"
 #include "pipeline/LabConversion.h"
 #include "pipeline/PipelineStep.h"
 #include "pipeline/XyzConversion.h"
@@ -102,6 +103,26 @@ int main(int argc, char** argv) {
         std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
         std::cout << "----------------------" << std::endl;
     }
+    {
+        glm::vec3 color = {1, 1, 1};
+        XyzColorSpace space;
+
+        std::unique_ptr<PipelineStep> pipeline = std::make_unique<XyzConversion>();
+
+        glm::vec3 piped = pipeline->execute(color);
+        glm::vec3 spaced = space.fromRGB(color);
+        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
+        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
+
+        pipeline->append(std::make_unique<XyzConversion>(true));
+
+        piped = pipeline->execute(color);
+        spaced = space.toRGB(spaced);
+
+        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
+        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
+        std::cout << "----------------------" << std::endl;
+    }
     argparse::ArgumentParser cli("Dithery Do");
 
     cli.add_argument("input").help("The input image");
@@ -183,39 +204,82 @@ int main(int argc, char** argv) {
     std::cout << "Colors:\t" << colors.size() << std::endl;
 
     // Map to desired color space
-    std::unique_ptr<IColorSpace> colorSpace;
+    std::unique_ptr<PipelineStep> pipeline = std::make_unique<NullStep>();
+
     switch (space) {
-    case ColorSpace::Rgb: colorSpace = nullptr; break;
-    case ColorSpace::Xyz: colorSpace = std::make_unique<XyzColorSpace>(); break;
-    case ColorSpace::Lab50: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D50); break;
-    case ColorSpace::Lab65: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D65); break;
+    case ColorSpace::Rgb: break;
+    case ColorSpace::Xyz: {
+        pipeline->append(std::make_unique<XyzConversion>());
+        break;
+    }
+    case ColorSpace::Lab50: {
+        pipeline->append(std::make_unique<XyzConversion>());
+        pipeline->append(std::make_unique<LabConversion>(LabConversion::D50));
+        break;
+    }
+    case ColorSpace::Lab65: {
+        pipeline->append(std::make_unique<XyzConversion>());
+        pipeline->append(std::make_unique<LabConversion>(LabConversion::D65));
+        break;
+    }
     }
 
-    std::unique_ptr<IColorSelector> colorSelector;
+    std::vector<glm::vec3> mapped(palette.colors());
+    std::transform(mapped.begin(), mapped.end(), mapped.begin(), [&pipeline](glm::vec3 v) {
+        return pipeline->execute(v);
+    });
+
     switch (algorithm) {
-    case Algorithm::ClosestEuclid:
-        colorSelector = std::make_unique<ClosestEuclidian>(palette, colorSpace.get());
+    case Algorithm::ClosestEuclid: {
+        pipeline->append(std::make_unique<ClosestEuclidian>(mapped));
         break;
-    case Algorithm::ClosestLine:
-        colorSelector = std::make_unique<ClosestLine>(palette, colorSpace.get());
+    }
+
+    case Algorithm::ClosestLine: {
+        pipeline->append(std::make_unique<ClosestLine>(mapped));
         break;
-    case Algorithm::ClosestPartition:
-        colorSelector = std::make_unique<ClosestPartition>(palette, colorSpace.get());
+    }
+        /*
+case Algorithm::ClosestPartition:
+colorSelector = std::make_unique<ClosestPartition>(palette, colorSpace.get());
+break;
+case Algorithm::ClosestTri:
+colorSelector = std::make_unique<BrightnessPartition>(palette);
+break;
+case Algorithm::Blend: {
+using namespace std::placeholders;
+colorSelector = std::make_unique<PartitionBlend>(
+palette, std::bind(brightness, channel, _1, _2), colorSpace.get()
+);
+break;
+}
+*/
+    default: {
+        std::cerr << "Unsupported algorithm" << std::endl;
+        return 1;
+    }
+    }
+
+    switch (space) {
+    case ColorSpace::Rgb: break;
+    case ColorSpace::Xyz: {
+        pipeline->append(std::make_unique<XyzConversion>(true));
         break;
-    case Algorithm::ClosestTri:
-        colorSelector = std::make_unique<BrightnessPartition>(palette);
+    }
+    case ColorSpace::Lab50: {
+        pipeline->append(std::make_unique<LabConversion>(LabConversion::D50, true));
+        pipeline->append(std::make_unique<XyzConversion>(true));
         break;
-    case Algorithm::Blend: {
-        using namespace std::placeholders;
-        colorSelector = std::make_unique<PartitionBlend>(
-            palette, std::bind(brightness, channel, _1, _2), colorSpace.get()
-        );
+    }
+    case ColorSpace::Lab65: {
+        pipeline->append(std::make_unique<LabConversion>(LabConversion::D65, true));
+        pipeline->append(std::make_unique<XyzConversion>(true));
         break;
     }
     }
 
     for (auto& [key, value] : colors) {
-        colors[key] = colorSelector->select(value);
+        colors[key] = pipeline->execute(value);
     }
 
     // Apply mapping to image
@@ -223,6 +287,7 @@ int main(int argc, char** argv) {
         uint8_t* color = data + (i * channels);
         uint32_t key = color_key(color[0], color[1], color[2]);
         glm::vec3 mapped = colors[key];
+        mapped = glm::clamp(mapped, {0, 0, 0}, {1, 1, 1});
         color[0] = mapped.r * 255;
         color[1] = mapped.g * 255;
         color[2] = mapped.b * 255;

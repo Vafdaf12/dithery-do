@@ -19,3 +19,7 @@ protected:
 private:
     std::unique_ptr<PipelineStep> m_next = nullptr;
 };
+class NullStep : public PipelineStep {
+private:
+    glm::vec3 process(glm::vec3 in) override { return in; }
+};

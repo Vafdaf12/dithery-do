@@ -1,18 +1,15 @@
 #pragma once
 
-#include "IColorSelector.h"
-#include "../Palette.h"
+#include "pipeline/PipelineStep.h"
 
-#include "../color/IColorSpace.h"
+#include <vector>
 
-class ClosestEuclidian : public IColorSelector {
+class ClosestEuclidian : public PipelineStep {
 public:
-    ClosestEuclidian(const Palette& palette, IColorSpace* colorSpace = nullptr);
-    glm::vec3 select(glm::vec3& target) override;
+    ClosestEuclidian(const std::vector<glm::vec3>& points) : m_points(points) {}
 
 private:
-    const Palette& m_palette;
-    IColorSpace* m_pColorSpace;
+    glm::vec3 process(glm::vec3 in) override;
 
-    std::vector<glm::vec3> m_mappedColours;
+    std::vector<glm::vec3> m_points;
 };
