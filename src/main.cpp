@@ -8,10 +8,10 @@
 #include "select/ClosestPartition.h"
 #include "select/IColorSelector.h"
 
+#include "argparse/argparse.hpp"
 #include "select/PartitionBlend.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
-#include "argparse/argparse.hpp"
 
 #include <exception>
 #include <filesystem>
@@ -73,9 +73,7 @@ glm::vec3 color_vec(uint32_t key) {
     return glm::vec3(r, g, b) / 255.0f;
 }
 
-bool brightness(glm::vec3 target, glm::vec3 value) {
-    return value.r < target.r;
-}
+bool brightness(int i, glm::vec3 target, glm::vec3 value) { return value[i] < target[i]; }
 int main(int argc, char** argv) {
     argparse::ArgumentParser cli("Dithery Do");
 
@@ -95,6 +93,13 @@ int main(int argc, char** argv) {
         .default_value("rgb")
         .required();
 
+    cli.add_argument("-c", "--channel")
+        .help("The channel to use for partition blend")
+        .default_value(0)
+        .choices(0, 1, 2)
+        .scan<'i', int>()
+        .required();
+
     // Parse the output
     std::string inputPath;
     std::string outputPath;
@@ -102,6 +107,7 @@ int main(int argc, char** argv) {
 
     Algorithm algorithm;
     ColorSpace space;
+    int channel;
 
     try {
         cli.parse_args(argc, argv);
@@ -111,6 +117,7 @@ int main(int argc, char** argv) {
         inputPath = validate_path(cli.get("input"));
         palettePath = validate_path(cli.get("palette"));
         outputPath = cli.get("-o");
+        channel = cli.get<int>("-c");
 
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -137,7 +144,6 @@ int main(int argc, char** argv) {
         std::cerr << "Failed to load palette" << std::endl;
         return 1;
     }
-
 
     // Get all distinct colors
     std::cout << "Pixels:\t" << width * height << std::endl;
@@ -171,9 +177,13 @@ int main(int argc, char** argv) {
     case Algorithm::ClosestTri:
         colorSelector = std::make_unique<BrightnessPartition>(palette);
         break;
-    case Algorithm::Blend:
-        colorSelector = std::make_unique<PartitionBlend>(palette, brightness, colorSpace.get());
+    case Algorithm::Blend: {
+        using namespace std::placeholders;
+        colorSelector = std::make_unique<PartitionBlend>(
+            palette, std::bind(brightness, channel, _1, _2), colorSpace.get()
+        );
         break;
+    }
     }
 
     for (auto& [key, value] : colors) {

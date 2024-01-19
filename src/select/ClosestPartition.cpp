@@ -88,6 +88,7 @@ glm::vec3 ClosestPartition::select(glm::vec3& target) {
 
     dir = glm::normalize(lighter - darker);
     float t = glm::dot(dest - darker, dir) / glm::distance(lighter, darker);
+    t = glm::clamp(t, 0.f, 1.f);
 
     return glm::mix(get(i), get(j), t);
 }

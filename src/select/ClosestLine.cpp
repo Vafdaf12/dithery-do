@@ -1,7 +1,6 @@
 #include "ClosestLine.h"
 #include "glm/geometric.hpp"
 #include <algorithm>
-#include <math.h>
 
 ClosestLine::ClosestLine(const Palette& palette, IColorSpace* colorSpace)
     : m_palette(palette)
@@ -52,12 +51,8 @@ glm::vec3 ClosestLine::select(glm::vec3& target) {
     glm::vec3 col2 = m_mappedColours[j];
     dir = glm::normalize(col2 - col1);
     float t = glm::dot(dir, dest - col1) / glm::distance(col1, col2);
-    if(t < 0) {
-        return {1, 1, 0};
-    }
-    if(t > 1) {
-        return {1, 0, 1};
-    }
+    t = glm::clamp(t, 0.f, 1.f);
+
 
     return glm::mix(m_palette.colors()[i], m_palette.colors()[j], t);
 }

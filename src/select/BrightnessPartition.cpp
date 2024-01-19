@@ -75,12 +75,7 @@ glm::vec3 BrightnessPartition::select(glm::vec3& target) {
 
     glm::vec3 dir = glm::normalize(lighter - darker);
     float t = glm::dot(dest - darker, dir) / glm::distance(lighter, darker);
-    if(t < 0) {
-        return {1, 1, 0};
-    }
-    if(t > 1) {
-        return {1, 0, 1};
-    }
+    t = glm::clamp(t, 0.f, 1.f);
 
     return glm::mix(get(i), get(j), t);
 }

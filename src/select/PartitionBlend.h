@@ -4,9 +4,11 @@
 #include "Palette.h"
 #include "color/IColorSpace.h"
 
+#include <functional>
+
 class PartitionBlend : public IColorSelector{
 public:
-    using Func = bool(*)(glm::vec3 target, glm::vec3 value);
+    using Func = std::function<bool(glm::vec3 target, glm::vec3 value)>;
 
     PartitionBlend(const Palette& palette, Func fn, IColorSpace* colorSpace = nullptr);
     glm::vec3 select(glm::vec3& target) override;
