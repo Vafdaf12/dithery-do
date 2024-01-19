@@ -52,6 +52,12 @@ glm::vec3 ClosestLine::select(glm::vec3& target) {
     glm::vec3 col2 = m_mappedColours[j];
     dir = glm::normalize(col2 - col1);
     float t = glm::dot(dir, dest - col1) / glm::distance(col1, col2);
+    if(t < 0) {
+        return {1, 1, 0};
+    }
+    if(t > 1) {
+        return {1, 0, 1};
+    }
 
     return glm::mix(m_palette.colors()[i], m_palette.colors()[j], t);
 }
