@@ -25,7 +25,6 @@ enum class ColorSpace : int { Rgb = 0, Xyz, Lab50, Lab65 };
 enum class Algorithm : int {
     ClosestEuclid = 0,
     ClosestLine,
-    ClosestTri,
     Blend,
 };
 ColorSpace space_from_string(const std::string& val) {
@@ -46,9 +45,7 @@ Algorithm algo_from_string(const std::string& val) {
         return Algorithm::ClosestEuclid;
     } else if (val == "line") {
         return Algorithm::ClosestLine;
-    } else if (val == "partition") {
-        return Algorithm::ClosestTri;
-    } else if (val == "blend") {
+    } else if (val == "blend_chan") {
         return Algorithm::Blend;
     } else {
         throw std::invalid_argument("Unsupported algorithm: " + val);
@@ -124,7 +121,7 @@ int main(int argc, char** argv) {
 
     cli.add_argument("-a", "-algo")
         .help("The color selection algorithm to use")
-        .choices("euclid", "line", "brightness", "blend")
+        .choices("euclid", "line", "blend_chan")
         .required();
 
     cli.add_argument("-s", "-space")
@@ -232,9 +229,6 @@ int main(int argc, char** argv) {
         break;
     }
         /*
-case Algorithm::ClosestTri:
-colorSelector = std::make_unique<BrightnessPartition>(palette);
-break;
 case Algorithm::Blend: {
 using namespace std::placeholders;
 colorSelector = std::make_unique<PartitionBlend>(

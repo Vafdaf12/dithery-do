@@ -25,7 +25,6 @@ Dithery Do currently supports RGB, XYZ, and L*a*b* (using D65 as illuminant)
 The selection algorithms are a bit more involved:
 - `euclid` = Smallest euclidian distance from the target
 - `line` = Blends between 2 selected colors based on a dot product
-- `brightness` = Uses LAB to select a light and dark color, blending between them
 - `blend` = Partitions the palette based on an axis and blends between colors from each partition
 
 # Building

@@ -37,7 +37,6 @@ add_executable(${NAME_EXE}
     src/main.cpp
     src/color/LabColorSpace.cpp
     src/color/XyzColorSpace.cpp
-    src/select/BrightnessPartition.cpp
     src/select/ClosestEuclidian.cpp
     src/select/ClosestLine.cpp
     src/select/PartitionBlend.cpp
