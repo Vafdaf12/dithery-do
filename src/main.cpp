@@ -21,7 +21,7 @@
 #include <string>
 #include <unordered_map>
 
-enum class ColorSpace : int { Rgb = 0, Xyz, Lab };
+enum class ColorSpace : int { Rgb = 0, Xyz, Lab50, Lab65 };
 
 enum class Algorithm : int {
     ClosestEuclid = 0,
@@ -35,8 +35,10 @@ ColorSpace space_from_string(const std::string& val) {
         return ColorSpace::Rgb;
     } else if (val == "xyz") {
         return ColorSpace::Xyz;
-    } else if (val == "lab") {
-        return ColorSpace::Lab;
+    } else if (val == "lab50") {
+        return ColorSpace::Lab50;
+    } else if (val == "lab65") {
+        return ColorSpace::Lab65;
     } else {
         throw std::invalid_argument("Unsupported color space: " + val);
     }
@@ -48,7 +50,7 @@ Algorithm algo_from_string(const std::string& val) {
         return Algorithm::ClosestLine;
     } else if (val == "partition") {
         return Algorithm::ClosestPartition;
-    } else if (val == "tri") {
+    } else if (val == "brightness") {
         return Algorithm::ClosestTri;
     } else if (val == "blend") {
         return Algorithm::Blend;
@@ -84,12 +86,12 @@ int main(int argc, char** argv) {
 
     cli.add_argument("-a", "-algo")
         .help("The color selection algorithm to use")
-        .choices("euclid", "line", "partition", "tri", "blend")
+        .choices("euclid", "line", "partition", "brightness", "blend")
         .required();
 
     cli.add_argument("-s", "-space")
         .help("The color space to use for selection")
-        .choices("rgb", "xyz", "lab")
+        .choices("rgb", "xyz", "lab50", "lab65")
         .default_value("rgb")
         .required();
 
@@ -160,7 +162,8 @@ int main(int argc, char** argv) {
     switch (space) {
     case ColorSpace::Rgb: colorSpace = nullptr; break;
     case ColorSpace::Xyz: colorSpace = std::make_unique<XyzColorSpace>(); break;
-    case ColorSpace::Lab: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D65); break;
+    case ColorSpace::Lab50: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D50); break;
+    case ColorSpace::Lab65: colorSpace = std::make_unique<LabColorSpace>(LabColorSpace::D65); break;
     }
 
     std::unique_ptr<IColorSelector> colorSelector;
