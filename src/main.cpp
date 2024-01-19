@@ -1,19 +1,14 @@
 #include "Palette.h"
-#include "color/IColorSpace.h"
 #include "color/LabColorSpace.h"
 #include "color/XyzColorSpace.h"
 #include "glm/common.hpp"
 #include "pipeline/LabConversion.h"
 #include "pipeline/PipelineStep.h"
 #include "pipeline/XyzConversion.h"
-#include "select/BrightnessPartition.h"
 #include "select/ClosestEuclidian.h"
 #include "select/ClosestLine.h"
-#include "select/ClosestPartition.h"
-#include "select/IColorSelector.h"
 
 #include "argparse/argparse.hpp"
-#include "select/PartitionBlend.h"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
@@ -30,7 +25,6 @@ enum class ColorSpace : int { Rgb = 0, Xyz, Lab50, Lab65 };
 enum class Algorithm : int {
     ClosestEuclid = 0,
     ClosestLine,
-    ClosestPartition,
     ClosestTri,
     Blend,
 };
@@ -53,8 +47,6 @@ Algorithm algo_from_string(const std::string& val) {
     } else if (val == "line") {
         return Algorithm::ClosestLine;
     } else if (val == "partition") {
-        return Algorithm::ClosestPartition;
-    } else if (val == "brightness") {
         return Algorithm::ClosestTri;
     } else if (val == "blend") {
         return Algorithm::Blend;
@@ -132,7 +124,7 @@ int main(int argc, char** argv) {
 
     cli.add_argument("-a", "-algo")
         .help("The color selection algorithm to use")
-        .choices("euclid", "line", "partition", "brightness", "blend")
+        .choices("euclid", "line", "brightness", "blend")
         .required();
 
     cli.add_argument("-s", "-space")
@@ -240,9 +232,6 @@ int main(int argc, char** argv) {
         break;
     }
         /*
-case Algorithm::ClosestPartition:
-colorSelector = std::make_unique<ClosestPartition>(palette, colorSpace.get());
-break;
 case Algorithm::ClosestTri:
 colorSelector = std::make_unique<BrightnessPartition>(palette);
 break;

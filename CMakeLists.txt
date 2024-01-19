@@ -40,7 +40,6 @@ add_executable(${NAME_EXE}
     src/select/BrightnessPartition.cpp
     src/select/ClosestEuclidian.cpp
     src/select/ClosestLine.cpp
-    src/select/ClosestPartition.cpp
     src/select/PartitionBlend.cpp
     src/pipeline/XyzConversion.cpp
     src/pipeline/LabConversion.cpp
