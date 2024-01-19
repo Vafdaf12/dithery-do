@@ -2,6 +2,9 @@
 #include "color/IColorSpace.h"
 #include "color/LabColorSpace.h"
 #include "color/XyzColorSpace.h"
+#include "pipeline/LabConversion.h"
+#include "pipeline/PipelineStep.h"
+#include "pipeline/XyzConversion.h"
 #include "select/BrightnessPartition.h"
 #include "select/ClosestEuclidian.h"
 #include "select/ClosestLine.h"
@@ -77,6 +80,28 @@ glm::vec3 color_vec(uint32_t key) {
 
 bool brightness(int i, glm::vec3 target, glm::vec3 value) { return value[i] < target[i]; }
 int main(int argc, char** argv) {
+    {
+        glm::vec3 color = {1, 1, 1};
+        LabColorSpace space(LabColorSpace::D65);
+
+        std::unique_ptr<PipelineStep> pipeline = std::make_unique<XyzConversion>();
+        pipeline->append(std::make_unique<LabConversion>(LabColorSpace::D65));
+
+        glm::vec3 piped = pipeline->execute(color);
+        glm::vec3 spaced = space.fromRGB(color);
+        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
+        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
+
+        pipeline->append(std::make_unique<LabConversion>(LabColorSpace::D65, true));
+        pipeline->append(std::make_unique<XyzConversion>(true));
+
+        piped = pipeline->execute(color);
+        spaced = space.toRGB(spaced);
+
+        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
+        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
+        std::cout << "----------------------" << std::endl;
+    }
     argparse::ArgumentParser cli("Dithery Do");
 
     cli.add_argument("input").help("The input image");

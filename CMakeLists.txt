@@ -42,6 +42,9 @@ add_executable(${NAME_EXE}
     src/select/ClosestLine.cpp
     src/select/ClosestPartition.cpp
     src/select/PartitionBlend.cpp
+    src/pipeline/XyzConversion.cpp
+    src/pipeline/LabConversion.cpp
+    src/pipeline/PipelineStep.cpp
     src/Palette.cpp
 )
 target_include_directories(${NAME_EXE}
