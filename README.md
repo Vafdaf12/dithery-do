@@ -3,6 +3,8 @@ Dithery-Do is mostly an artistic project that provides methods to colour an imag
 to some pre-defined pallette, kind of like how an artists paints their pictures. More generally
 though, this project serves as an exploration of image dithering and efficient image processing.
 
+![DitheryDo](https://github.com/Vafdaf12/dithery-do/assets/25525445/696a93a3-4a34-46c9-8591-986bcd9bbccb)
+
 # Usage
 The general CLI syntax for Dithery-Do is the following
 
