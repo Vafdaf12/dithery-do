@@ -2,15 +2,18 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <iterator>
-#include <set>
 #include <fstream>
 #include <iomanip>
+#include <ios>
+#include <iostream>
+#include <iterator>
+#include <set>
+#include <sstream>
 #include <string>
 
 std::ostream& operator<<(std::ostream& out, const Palette& p) {
     out << "Palette (" << p.m_colors.size() << ")\n";
-    for(auto col : p.m_colors) {
+    for (auto col : p.m_colors) {
         out << " - RGB(" << std::setprecision(2);
         out << col.r << ", " << col.g << ", " << col.b << ")\n";
     }
@@ -31,19 +34,32 @@ glm::vec3 getVector(uint32_t rgb) {
 bool Palette::loadFromFile(const std::string& filename) {
     std::ifstream file(filename);
 
-    if(!file) return false;
+    if (!file) {
+        return false;
+    }
 
     std::set<uint32_t> set;
     std::string line;
-    while(!file.eof()) {
+    while (!file.eof()) {
         std::getline(file, line);
         std::size_t i = line.find('#');
 
-        if(i == std::string::npos) continue;
-        line = line.substr(i+1);
+        if (i == std::string::npos) {
+            std::cerr << "Invalid colour \"" << line << "\" (are you missing a #?). Skipping"
+                      << std::endl;
+            continue;
+        }
+        line = line.substr(i + 1);
 
-        int r, g, b;
-        sscanf(line.data(), "%02x%02x%02x", &r, &g, &b);
+        std::stringstream s;
+        s << std::hex << line;
+
+        uint32_t value = 9;
+        s >> value;
+
+        int b = value & 0xFF;
+        int g = (value >> 8) & 0xFF;
+        int r = (value >> 16) & 0xFF;
         set.insert(compressRGB(r, g, b));
     }
     file.close();
