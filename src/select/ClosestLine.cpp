@@ -3,13 +3,13 @@
 #include <algorithm>
 
 glm::vec3 ClosestLine::process(glm::vec3 dest) {
-
     glm::vec3 col1 = *std::min_element(
         m_points.begin(),
         m_points.end(),
         [&](const glm::vec3& v, const glm::vec3& max) {
             return glm::distance(dest, v) < glm::distance(dest, max);
         });
+    
 
     glm::vec3 dir = glm::normalize(col1-dest);
 

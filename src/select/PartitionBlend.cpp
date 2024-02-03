@@ -12,7 +12,7 @@ glm::vec3 PartitionBlend::process(glm::vec3 dest) {
 
 
     auto boundary = std::partition(index.begin(), index.end(), [dest, this](int i) {
-        return m_partition(dest, m_points[i]);
+        return glm::dot(m_points[i] - dest, m_partitionVector) > 0;
     });
 
     auto left = std::min_element(index.begin(), boundary, [dest, this](int i, int j) {

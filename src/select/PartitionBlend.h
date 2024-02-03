@@ -2,17 +2,16 @@
 
 #include "pipeline/PipelineStep.h"
 
-#include <functional>
+#include <vector>
 
-class PartitionBlend : public PipelineStep{
+class PartitionBlend : public PipelineStep {
 public:
-    using Func = std::function<bool(glm::vec3 target, glm::vec3 value)>;
+    PartitionBlend(const std::vector<glm::vec3>& points, glm::vec3 partitionVec)
+        : m_points(points), m_partitionVector(partitionVec) {}
 
-    PartitionBlend(const std::vector<glm::vec3>& points, Func fn) : m_points(points), m_partition(fn){}
 private:
-
     glm::vec3 process(glm::vec3 target) override;
 
-    Func m_partition;
+    glm::vec3 m_partitionVector;
     std::vector<glm::vec3> m_points;
 };

@@ -1,7 +1,6 @@
 #include "Palette.h"
-#include "color/LabColorSpace.h"
-#include "color/XyzColorSpace.h"
 #include "glm/common.hpp"
+#include "glm/geometric.hpp"
 #include "pipeline/LabConversion.h"
 #include "pipeline/PipelineStep.h"
 #include "pipeline/XyzConversion.h"
@@ -26,7 +25,7 @@ enum class ColorSpace : int { Rgb = 0, Xyz, Lab50, Lab65 };
 enum class Algorithm : int {
     ClosestEuclid = 0,
     ClosestLine,
-    ChannelPartition,
+    DotBlend,
 };
 ColorSpace space_from_string(const std::string& val) {
     if (val == "rgb") {
@@ -46,8 +45,8 @@ Algorithm algo_from_string(const std::string& val) {
         return Algorithm::ClosestEuclid;
     } else if (val == "line") {
         return Algorithm::ClosestLine;
-    } else if (val == "blend_chan") {
-        return Algorithm::ChannelPartition;
+    } else if (val == "dot_blend") {
+        return Algorithm::DotBlend;
     } else {
         throw std::invalid_argument("Unsupported algorithm: " + val);
     }
@@ -69,50 +68,7 @@ glm::vec3 color_vec(uint32_t key) {
     return glm::vec3(r, g, b) / 255.0f;
 }
 
-bool brightness(int i, glm::vec3 target, glm::vec3 value) { return value[i] < target[i]; }
 int main(int argc, char** argv) {
-    {
-        glm::vec3 color = {1, 1, 1};
-        LabColorSpace space(LabColorSpace::D65);
-
-        std::unique_ptr<PipelineStep> pipeline = std::make_unique<XyzConversion>();
-        pipeline->append(std::make_unique<LabConversion>(LabColorSpace::D65));
-
-        glm::vec3 piped = pipeline->execute(color);
-        glm::vec3 spaced = space.fromRGB(color);
-        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
-        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
-
-        pipeline->append(std::make_unique<LabConversion>(LabColorSpace::D65, true));
-        pipeline->append(std::make_unique<XyzConversion>(true));
-
-        piped = pipeline->execute(color);
-        spaced = space.toRGB(spaced);
-
-        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
-        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
-        std::cout << "----------------------" << std::endl;
-    }
-    {
-        glm::vec3 color = {1, 1, 1};
-        XyzColorSpace space;
-
-        std::unique_ptr<PipelineStep> pipeline = std::make_unique<XyzConversion>();
-
-        glm::vec3 piped = pipeline->execute(color);
-        glm::vec3 spaced = space.fromRGB(color);
-        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
-        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
-
-        pipeline->append(std::make_unique<XyzConversion>(true));
-
-        piped = pipeline->execute(color);
-        spaced = space.toRGB(spaced);
-
-        std::cout << piped.x << " " << piped.y << " " << piped.z << std::endl;
-        std::cout << spaced.x << " " << spaced.y << " " << spaced.z << std::endl;
-        std::cout << "----------------------" << std::endl;
-    }
     argparse::ArgumentParser cli("Dithery Do");
 
     cli.add_argument("input").help("The input image");
@@ -122,7 +78,7 @@ int main(int argc, char** argv) {
 
     cli.add_argument("-a", "-algo")
         .help("The color selection algorithm to use")
-        .choices("euclid", "line", "blend_chan")
+        .choices("euclid", "line", "dot_blend")
         .required();
 
     cli.add_argument("-s", "-space")
@@ -131,12 +87,11 @@ int main(int argc, char** argv) {
         .default_value("rgb")
         .required();
 
-    cli.add_argument("-c", "--channel")
-        .help("The channel to use for partition blend")
-        .default_value(0)
-        .choices(0, 1, 2)
-        .scan<'i', int>()
-        .required();
+    cli.add_argument("-v", "--vector")
+        .help("The direction vector to use for dot blend")
+        .nargs(3)
+        .default_value(std::vector<float>{1, 0, 0})
+        .scan<'g', float>();
 
     // Parse the output
     std::string inputPath;
@@ -145,7 +100,7 @@ int main(int argc, char** argv) {
 
     Algorithm algorithm;
     ColorSpace space;
-    int channel;
+    glm::vec3 vec;
 
     try {
         cli.parse_args(argc, argv);
@@ -155,8 +110,9 @@ int main(int argc, char** argv) {
         inputPath = validate_path(cli.get("input"));
         palettePath = validate_path(cli.get("palette"));
         outputPath = cli.get("-o");
-        channel = cli.get<int>("-c");
-
+        auto vals = cli.get<std::vector<float>>("-v");
+        vec = {vals[0], vals[1], vals[2]};
+        vec = glm::normalize(vec);
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         std::cerr << cli;
@@ -229,12 +185,9 @@ int main(int argc, char** argv) {
         pipeline->append(std::make_unique<ClosestLine>(mapped));
         break;
     }
-    case Algorithm::ChannelPartition: {
+    case Algorithm::DotBlend: {
         using namespace std::placeholders;
-        pipeline->append(
-            std::make_unique<PartitionBlend>(mapped, std::bind(brightness, channel, _1, _2))
-        );
-        break;
+        pipeline->append(std::make_unique<PartitionBlend>(mapped, vec));
     }
     }
 
