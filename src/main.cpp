@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
     cli.add_argument("input").help("The input image");
     cli.add_argument("palette").help("Path to palette file");
 
-    cli.add_argument("-o").help("Path of output image").default_value("output.jpg");
+    cli.add_argument("-o").help("Path of output image").default_value("output.png");
 
     cli.add_argument("-a", "-algo")
         .help("The color selection algorithm to use")
@@ -207,7 +207,7 @@ int main(int argc, char** argv) {
     }
 
     // Write image to file
-    int result = stbi_write_jpg(outputPath.c_str(), width, height, channels, data, 100);
+    int result = stbi_write_png(outputPath.c_str(), width, height, channels, data, channels*width);
     if (result == 0) {
         std::cerr << "Failed to write image: " << stbi_failure_reason() << std::endl;
         return 1;
