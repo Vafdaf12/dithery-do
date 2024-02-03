@@ -1,14 +1,14 @@
 #include "Palette.h"
-#include "glm/common.hpp"
-#include "glm/geometric.hpp"
 #include "pipeline/LabConversion.h"
 #include "pipeline/PipelineStep.h"
 #include "pipeline/XyzConversion.h"
 #include "select/ClosestEuclidian.h"
 #include "select/ClosestLine.h"
+#include "select/PartitionBlend.h"
 
 #include "argparse/argparse.hpp"
-#include "select/PartitionBlend.h"
+#include "glm/common.hpp"
+#include "glm/geometric.hpp"
 #include "stb/stb_image.h"
 #include "stb/stb_image_write.h"
 
@@ -19,27 +19,44 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-
-enum class ColorSpace : int { Rgb = 0, Xyz, Lab50, Lab65 };
+#include <utility>
 
 enum class Algorithm : int {
     ClosestEuclid = 0,
     ClosestLine,
     DotBlend,
 };
-ColorSpace space_from_string(const std::string& val) {
+std::pair<std::unique_ptr<PipelineStep>, std::unique_ptr<PipelineStep>>
+createColorSpace(const std::string& val) {
     if (val == "rgb") {
-        return ColorSpace::Rgb;
+        return {
+            std::make_unique<NullStep>(),
+            std::make_unique<NullStep>(),
+        };
     } else if (val == "xyz") {
-        return ColorSpace::Xyz;
+        return {
+            std::make_unique<XyzConversion>(),
+            std::make_unique<XyzConversion>(true),
+        };
     } else if (val == "lab50") {
-        return ColorSpace::Lab50;
+        auto from = std::make_unique<XyzConversion>();
+        from->append(std::make_unique<LabConversion>(LabConversion::D50));
+
+        auto to = std::make_unique<LabConversion>(LabConversion::D50, true);
+        to->append(std::make_unique<XyzConversion>(true));
+        return {std::move(from), std::move(to)};
     } else if (val == "lab65") {
-        return ColorSpace::Lab65;
+        auto from = std::make_unique<XyzConversion>();
+        from->append(std::make_unique<LabConversion>(LabConversion::D65));
+
+        auto to = std::make_unique<LabConversion>(LabConversion::D65, true);
+        to->append(std::make_unique<XyzConversion>(true));
+        return {std::move(from), std::move(to)};
     } else {
         throw std::invalid_argument("Unsupported color space: " + val);
     }
 }
+
 Algorithm algo_from_string(const std::string& val) {
     if (val == "euclid") {
         return Algorithm::ClosestEuclid;
@@ -99,20 +116,20 @@ int main(int argc, char** argv) {
     std::string palettePath;
 
     Algorithm algorithm;
-    ColorSpace space;
+    std::pair<std::unique_ptr<PipelineStep>, std::unique_ptr<PipelineStep>> colorSpace;
     glm::vec3 vec;
 
     try {
         cli.parse_args(argc, argv);
-
+        colorSpace = createColorSpace(cli.get("-space"));
         algorithm = algo_from_string(cli.get("-algo"));
-        space = space_from_string(cli.get("-space"));
         inputPath = validate_path(cli.get("input"));
         palettePath = validate_path(cli.get("palette"));
         outputPath = cli.get("-o");
         auto vals = cli.get<std::vector<float>>("-v");
         vec = {vals[0], vals[1], vals[2]};
         vec = glm::normalize(vec);
+
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         std::cerr << cli;
@@ -123,7 +140,6 @@ int main(int argc, char** argv) {
     std::cout << "Write File: " << outputPath << std::endl;
     std::cout << "Palette: " << palettePath << std::endl;
     std::cout << "Algorithm: " << int(algorithm) << std::endl;
-    std::cout << "Color Space: " << int(space) << std::endl;
 
     // Load input data
     int width, height, channels;
@@ -150,25 +166,7 @@ int main(int argc, char** argv) {
     std::cout << "Colors:\t" << colors.size() << std::endl;
 
     // Map to desired color space
-    std::unique_ptr<PipelineStep> pipeline = std::make_unique<NullStep>();
-
-    switch (space) {
-    case ColorSpace::Rgb: break;
-    case ColorSpace::Xyz: {
-        pipeline->append(std::make_unique<XyzConversion>());
-        break;
-    }
-    case ColorSpace::Lab50: {
-        pipeline->append(std::make_unique<XyzConversion>());
-        pipeline->append(std::make_unique<LabConversion>(LabConversion::D50));
-        break;
-    }
-    case ColorSpace::Lab65: {
-        pipeline->append(std::make_unique<XyzConversion>());
-        pipeline->append(std::make_unique<LabConversion>(LabConversion::D65));
-        break;
-    }
-    }
+    std::unique_ptr<PipelineStep> pipeline = std::move(colorSpace.first);
 
     std::vector<glm::vec3> mapped(palette.colors());
     std::transform(mapped.begin(), mapped.end(), mapped.begin(), [&pipeline](glm::vec3 v) {
@@ -186,28 +184,12 @@ int main(int argc, char** argv) {
         break;
     }
     case Algorithm::DotBlend: {
-        using namespace std::placeholders;
         pipeline->append(std::make_unique<PartitionBlend>(mapped, vec));
+        break;
     }
     }
 
-    switch (space) {
-    case ColorSpace::Rgb: break;
-    case ColorSpace::Xyz: {
-        pipeline->append(std::make_unique<XyzConversion>(true));
-        break;
-    }
-    case ColorSpace::Lab50: {
-        pipeline->append(std::make_unique<LabConversion>(LabConversion::D50, true));
-        pipeline->append(std::make_unique<XyzConversion>(true));
-        break;
-    }
-    case ColorSpace::Lab65: {
-        pipeline->append(std::make_unique<LabConversion>(LabConversion::D65, true));
-        pipeline->append(std::make_unique<XyzConversion>(true));
-        break;
-    }
-    }
+    pipeline->append(std::move(colorSpace.second));
 
     for (auto& [key, value] : colors) {
         colors[key] = pipeline->execute(value);
