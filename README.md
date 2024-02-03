@@ -16,16 +16,16 @@ where:
 - `-o` = Path to output file (`output.jpg` by default)
 - `-a`/`-algo` = The color selection algorithm to use
 - `-s`/`-space` = The color space to use for selection
-- `-c`/`--channel` = The channel to use for the `blend` algorithm (see below)
+- `-v`/`--vector` = The direction vector to use for the `dot_blend` algorithm (see below)
 
 *Note: the necessary parameters can also be found by running `./DitherDo --help`*
 
-Dithery Do currently supports RGB, XYZ, and L*a*b* (using D65 as illuminant)
+Dithery Do currently supports RGB, XYZ, and L*a*b* (using D65 or D50 as illuminant)
 
 The selection algorithms are a bit more involved:
 - `euclid` = Smallest euclidian distance from the target
 - `line` = Blends between 2 selected colors based on a dot product
-- `blend` = Partitions the palette based on an axis and blends between colors from each partition
+- `dot_blend` = Partitions the palette based on a dot product and blends between colors from each partition
 
 # Building
 Building this project requires CMake, which can be installed on Debian-based OSs with
