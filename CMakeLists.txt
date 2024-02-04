@@ -13,19 +13,15 @@ set(CMAKE_BUILD_TYPE Debug)
 set(NAME_EXE ${PROJECT_NAME})
 
 
-# ------------ FETCH GLM ------------
 FetchContent_Declare(glm
     GIT_REPOSITORY https://github.com/g-truc/glm
     GIT_TAG 0.9.9.8
 )
-FetchContent_MakeAvailable(glm)
-
-# ------------ FETCH CLI11 ------------
-FetchContent_Declare(
-    argparse
+FetchContent_Declare(argparse
     GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+    GIT_TAG v3.0
 )
-FetchContent_MakeAvailable(argparse)
+FetchContent_MakeAvailable(argparse glm)
 
 
 # ------------ CONFIGURE APPLICATION -------------------
